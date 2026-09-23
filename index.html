@@ -2,169 +2,146 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<title>PhoneLab — Interactive 3D Teardown</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#070a11" />
+<title>PhoneLab — Mobile</title>
 <style>
   :root{
-    --bg:#070a11;
-    --panel:rgba(15,21,33,0.82);
-    --line:rgba(120,160,255,0.18);
-    --txt:#dbe6f7;
-    --dim:#8291aa;
-    --acc:#4da3ff;
-    --warn:#ff9a4d;
-    --bad:#ff5a6e;
-    --ok:#3ddc9a;
+    --bg:#070a11; --panel:rgba(15,21,33,0.88); --line:rgba(120,160,255,0.18);
+    --txt:#dbe6f7; --dim:#8291aa; --acc:#4da3ff;
   }
-  *{box-sizing:border-box;}
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);
     font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    color:var(--txt);-webkit-font-smoothing:antialiased;}
-  canvas{display:block;}
-
+    color:var(--txt);-webkit-font-smoothing:antialiased;
+    overscroll-behavior:none; touch-action:none; user-select:none;}
+  canvas{display:block; touch-action:none;}
   #ui{position:fixed;inset:0;pointer-events:none;z-index:10;}
-  .panel{
-    background:var(--panel);
-    border:1px solid var(--line);
-    border-radius:14px;
-    backdrop-filter:blur(14px);
-    -webkit-backdrop-filter:blur(14px);
-    box-shadow:0 12px 40px rgba(0,0,0,.55);
-    pointer-events:auto;
-  }
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    box-shadow:0 10px 30px rgba(0,0,0,.5);pointer-events:auto;}
 
-  /* ---------- header ---------- */
-  #header{position:absolute;top:18px;left:20px;}
-  #header h1{
-    margin:0;font-size:19px;letter-spacing:.18em;font-weight:800;
-  }
+  /* header */
+  #header{position:absolute;top:12px;left:14px;}
+  #header h1{margin:0;font-size:15px;letter-spacing:.16em;font-weight:800;}
   #header h1 span{color:var(--acc);}
-  #header p{margin:3px 0 0;font-size:11.5px;color:var(--dim);letter-spacing:.04em;}
+  #header p{margin:2px 0 0;font-size:10px;color:var(--dim);letter-spacing:.04em;}
 
-  /* ---------- tools ---------- */
-  #tools{
-    position:absolute;left:20px;top:50%;transform:translateY(-50%);
-    display:flex;flex-direction:column;gap:6px;padding:8px;width:132px;
-  }
-  #tools button{
-    all:unset;cursor:pointer;display:flex;align-items:center;gap:9px;
-    padding:9px 10px;border-radius:10px;font-size:12.5px;font-weight:600;
-    color:var(--dim);transition:.15s;border:1px solid transparent;
-  }
-  #tools button span{font-size:15px;width:18px;text-align:center;filter:grayscale(1) opacity(.7);}
-  #tools button:hover{background:rgba(77,163,255,.10);color:var(--txt);}
-  #tools button.active{
-    background:rgba(77,163,255,.16);color:#fff;border-color:rgba(77,163,255,.45);
-    box-shadow:0 0 18px rgba(77,163,255,.18) inset;
-  }
+  #fps{position:absolute;top:12px;right:14px;padding:6px 10px;
+    font-family:ui-monospace,monospace;font-size:11px;color:#3ddc9a;
+    letter-spacing:.05em;font-weight:600;}
+  #fps span{color:var(--dim);}
+
+  /* tools — horizontal bar at bottom on mobile */
+  #tools{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);
+    display:flex;gap:4px;padding:6px;max-width:96vw;}
+  #tools button{all:unset;cursor:pointer;display:flex;flex-direction:column;
+    align-items:center;gap:2px;padding:8px 10px;border-radius:10px;
+    font-size:9px;font-weight:600;color:var(--dim);transition:.15s;
+    border:1px solid transparent;min-width:52px;}
+  #tools button span{font-size:19px;line-height:1;filter:grayscale(1) opacity(.65);}
+  #tools button.active{background:rgba(77,163,255,.16);color:#fff;
+    border-color:rgba(77,163,255,.45);}
   #tools button.active span{filter:none;}
 
-  /* ---------- info ---------- */
-  #info{
-    position:absolute;right:20px;top:18px;width:290px;padding:16px 16px 14px;
-    opacity:0;transform:translateY(-8px);transition:.25s;pointer-events:none;
-  }
+  /* info card */
+  #info{position:absolute;left:12px;right:12px;top:50px;padding:12px 14px;
+    opacity:0;transform:translateY(-8px);transition:.25s;pointer-events:none;}
   #info.show{opacity:1;transform:none;pointer-events:auto;}
-  #info h2{margin:0 0 8px;font-size:14px;letter-spacing:.04em;color:#fff;}
+  #info h2{margin:0 0 6px;font-size:13px;letter-spacing:.03em;color:#fff;}
   #info h2::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;
-    background:var(--acc);margin-right:8px;vertical-align:middle;box-shadow:0 0 10px var(--acc);}
-  #info p{margin:0;font-size:12.3px;line-height:1.6;color:#a9b8d0;}
-  #info .heatwrap{margin-top:12px;display:none;}
+    background:var(--acc);margin-right:7px;vertical-align:middle;}
+  #info p{margin:0;font-size:12px;line-height:1.55;color:#a9b8d0;}
+  #info .heatwrap{margin-top:10px;display:none;}
   #info .heatwrap.on{display:block;}
   #info .heatbar{height:5px;border-radius:3px;background:rgba(255,255,255,.09);overflow:hidden;}
   #info .heatfill{height:100%;width:0%;border-radius:3px;
     background:linear-gradient(90deg,#ff9a4d,#ff4d4d);transition:width .1s linear;}
-  #info small{display:block;margin-top:6px;font-size:10.5px;color:var(--dim);letter-spacing:.05em;}
+  #info small{display:block;margin-top:5px;font-size:10px;color:var(--dim);letter-spacing:.05em;}
 
-  /* ---------- bottom ---------- */
-  #bottom{
-    position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
-    display:flex;align-items:center;gap:14px;padding:11px 16px;white-space:nowrap;
-  }
-  #bottom label{font-size:11.5px;color:var(--dim);letter-spacing:.08em;display:flex;align-items:center;gap:10px;}
-  input[type=range]{
-    -webkit-appearance:none;appearance:none;width:170px;height:4px;border-radius:3px;
-    background:linear-gradient(90deg,var(--acc),rgba(255,255,255,.14));outline:none;cursor:pointer;
-  }
-  input[type=range]::-webkit-slider-thumb{
-    -webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:#fff;
-    box-shadow:0 0 10px rgba(77,163,255,.9);cursor:grab;
-  }
-  input[type=range]::-moz-range-thumb{width:15px;height:15px;border:none;border-radius:50%;
-    background:#fff;box-shadow:0 0 10px rgba(77,163,255,.9);cursor:grab;}
-  .btn{
-    all:unset;cursor:pointer;font-size:11.5px;font-weight:600;letter-spacing:.05em;
-    padding:7px 13px;border-radius:9px;color:var(--txt);
+  /* bottom bar */
+  #bottom{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);
+    display:flex;align-items:center;gap:8px;padding:8px 10px;max-width:96vw;}
+  #bottom label{font-size:10px;color:var(--dim);letter-spacing:.06em;
+    display:flex;align-items:center;gap:7px;}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:96px;height:4px;
+    border-radius:3px;background:linear-gradient(90deg,var(--acc),rgba(255,255,255,.14));
+    outline:none;cursor:pointer;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;
+    border-radius:50%;background:#fff;box-shadow:0 0 8px rgba(77,163,255,.9);}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border:none;border-radius:50%;
+    background:#fff;box-shadow:0 0 8px rgba(77,163,255,.9);}
+  .btn{all:unset;cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.04em;
+    padding:8px 11px;border-radius:9px;color:var(--txt);
     background:rgba(255,255,255,.06);border:1px solid var(--line);transition:.15s;
-  }
-  .btn:hover{background:rgba(77,163,255,.18);border-color:rgba(77,163,255,.5);}
+    white-space:nowrap;}
+  .btn:active{background:rgba(77,163,255,.22);}
   .btn.file{position:relative;overflow:hidden;}
-  .btn.file input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0;}
+  .btn.file input{position:absolute;inset:0;opacity:0;font-size:0;}
 
-  /* ---------- toast ---------- */
-  #toast{
-    position:absolute;left:50%;bottom:96px;transform:translate(-50%,10px);
-    background:rgba(12,18,30,.95);border:1px solid var(--line);
-    padding:10px 18px;border-radius:11px;font-size:12.5px;color:#dbe6f7;
-    opacity:0;transition:.28s;pointer-events:none;max-width:80vw;text-align:center;
-    box-shadow:0 10px 30px rgba(0,0,0,.6);
-  }
+  #toast{position:absolute;left:50%;bottom:150px;transform:translate(-50%,10px);
+    background:rgba(12,18,30,.96);border:1px solid var(--line);padding:9px 14px;
+    border-radius:10px;font-size:12px;color:#dbe6f7;opacity:0;transition:.25s;
+    pointer-events:none;max-width:88vw;text-align:center;
+    box-shadow:0 8px 24px rgba(0,0,0,.6);}
   #toast.show{opacity:1;transform:translate(-50%,0);}
 
-  /* ---------- labels ---------- */
   #labels{position:absolute;inset:0;pointer-events:none;}
-  .label{
-    position:absolute;left:0;top:0;font-size:10px;font-weight:700;letter-spacing:.09em;
+  .label{position:absolute;left:0;top:0;font-size:9px;font-weight:700;letter-spacing:.07em;
     color:#bfe0ff;text-transform:uppercase;white-space:nowrap;opacity:0;transition:opacity .3s;
-    text-shadow:0 0 8px #000,0 0 3px #000,0 0 12px rgba(77,163,255,.8);
-    padding:2px 7px;border-radius:20px;background:rgba(10,20,40,.5);
-    border:1px solid rgba(120,180,255,.25);
-  }
+    text-shadow:0 0 6px #000,0 0 2px #000;padding:2px 6px;border-radius:20px;
+    background:rgba(10,20,40,.6);border:1px solid rgba(120,180,255,.25);}
 
-  @media (max-width:900px){
-    #tools{width:auto;flex-direction:row;flex-wrap:wrap;left:50%;top:auto;bottom:96px;
-      transform:translateX(-50%);justify-content:center;max-width:94vw;}
-    #tools button{padding:8px;font-size:0;gap:0;}
-    #tools button span{font-size:17px;}
-    #info{right:12px;left:12px;top:auto;bottom:158px;width:auto;}
-    #bottom{flex-wrap:wrap;justify-content:center;gap:9px;bottom:12px;max-width:96vw;}
-    input[type=range]{width:110px;}
-    #header{left:14px;top:12px;}
-    #header h1{font-size:15px;}
+  @media (min-width:820px){
+    #header{top:18px;left:20px;}
+    #header h1{font-size:19px;}
+    #header p{font-size:11.5px;}
+    #fps{top:18px;right:20px;font-size:12px;padding:7px 12px;}
+    #tools{left:20px;bottom:auto;top:50%;transform:translateY(-50%);
+      flex-direction:column;gap:6px;padding:8px;max-width:none;}
+    #tools button{flex-direction:row;font-size:12.5px;padding:9px 10px;min-width:132px;gap:9px;}
+    #tools button span{font-size:15px;width:18px;}
+    #info{left:auto;right:20px;top:64px;width:290px;padding:16px;transform:translateY(-8px);}
+    #info h2{font-size:14px;}
+    #info p{font-size:12.5px;}
+    #bottom{gap:14px;padding:11px 16px;}
+    input[type=range]{width:170px;}
+    #toast{bottom:100px;font-size:12.5px;}
   }
 </style>
 </head>
 <body>
-
 <div id="ui">
   <div id="header">
     <h1>PHONE<span>LAB</span></h1>
-    <p>Interactive teardown &amp; damage simulator</p>
+    <p>Teardown simulator</p>
   </div>
+
+  <div id="fps" class="panel">FPS <span>—</span></div>
 
   <div id="tools" class="panel">
     <button data-tool="inspect" class="active"><span>🔍</span>Inspect</button>
-    <button data-tool="heat"><span>🔥</span>Heat Gun</button>
-    <button data-tool="pry"><span>🪛</span>Pry Tool</button>
-    <button data-tool="screw"><span>🔧</span>Screwdriver</button>
-    <button data-tool="knife"><span>🔪</span>Knife</button>
-    <button data-tool="hammer"><span>🔨</span>Hammer</button>
+    <button data-tool="heat"><span>🔥</span>Heat</button>
+    <button data-tool="pry"><span>🪛</span>Pry</button>
+    <button data-tool="screw"><span>🔧</span>Screw</button>
+    <button data-tool="knife"><span>🔪</span>Cut</button>
+    <button data-tool="hammer"><span>🔨</span>Smash</button>
   </div>
 
   <aside id="info" class="panel">
     <h2 id="infoTitle">Select a part</h2>
-    <p id="infoText">Click any component with the Inspect tool to learn what it does.</p>
+    <p id="infoText">Tap any part with the Inspect tool to learn what it does.</p>
     <div class="heatwrap" id="heatWrap">
       <div class="heatbar"><div class="heatfill" id="heatFill"></div></div>
-      <small id="heatLabel">ADHESIVE 0% SOFTENED</small>
+      <small id="heatLabel">GLUE 0% SOFTENED</small>
     </div>
   </aside>
 
   <div id="bottom" class="panel">
-    <label>EXPLODE <input type="range" id="explode" min="0" max="100" value="0"></label>
+    <label>SPLIT <input type="range" id="explode" min="0" max="100" value="0"></label>
     <button class="btn" id="autoBtn">AUTO</button>
-    <button class="btn" id="repairBtn">REPAIR</button>
-    <label class="btn file">LOAD VIDEO<input type="file" id="videoFile" accept="video/*"></label>
+    <button class="btn" id="repairBtn">FIX</button>
+    <label class="btn file">VIDEO<input type="file" id="videoFile" accept="video/*"></label>
   </div>
 
   <div id="toast"></div>
@@ -183,84 +160,106 @@
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-/* ══════════════════════════════════════════════════════════════
-   1. RENDERER · SCENE · CAMERA
-   ══════════════════════════════════════════════════════════════ */
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+/* ═══════════════════════════════════════════════════════════
+   1. DEVICE DETECTION & QUALITY
+   ═══════════════════════════════════════════════════════════ */
+const isMobile = /Android|iPhone|iPad|iPod|Mobile|Silk/i.test(navigator.userAgent)
+              || (navigator.maxTouchPoints > 1 && innerWidth < 900)
+              || innerWidth < 700;
+
+const QUALITY = isMobile ? {
+  pixelRatio: 1,
+  antialias: false,
+  screenW: 320,
+  screenH: 640,
+  screenFps: 30,
+  segments: 8,
+} : {
+  pixelRatio: Math.min(devicePixelRatio, 2),
+  antialias: true,
+  screenW: 512,
+  screenH: 1024,
+  screenFps: 60,
+  segments: 16,
+};
+
+/* ═══════════════════════════════════════════════════════════
+   2. RENDERER · SCENE · CAMERA
+   ═══════════════════════════════════════════════════════════ */
+const renderer = new THREE.WebGLRenderer({
+  antialias: QUALITY.antialias,
+  powerPreference: 'default',
+  failIfMajorPerformanceCaveat: false,
+});
+renderer.setPixelRatio(QUALITY.pixelRatio);
 renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x070a11);
-scene.fog = new THREE.Fog(0x070a11, 20, 46);
+scene.fog = new THREE.Fog(0x070a11, 18, 40);
 
-const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 200);
-camera.position.set(0, 0.9, 13);
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 120);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.dampingFactor = 0.075;
-controls.minDistance = 6;
-controls.maxDistance = 28;
-controls.target.set(0, 0, 0);
+controls.dampingFactor = 0.09;
+controls.minDistance = 7;
+controls.maxDistance = 24;
+controls.rotateSpeed = 0.6;
+controls.zoomSpeed = 0.9;
+controls.enablePan = false;
+controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
 
-/* environment for nice metal reflections */
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+function framePhone() {
+  const aspect = innerWidth / innerHeight;
+  const dist = aspect < 0.7 ? 16 : aspect < 1.1 ? 14 : 12.5;
+  camera.position.set(0, 0.8, dist);
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+framePhone();
 
-/* ══════════════════════════════════════════════════════════════
-   2. LIGHTS · FLOOR
-   ══════════════════════════════════════════════════════════════ */
-scene.add(new THREE.HemisphereLight(0x9fc0ff, 0x0c1018, 0.55));
+/* ═══════════════════════════════════════════════════════════
+   3. LIGHTS (no shadows — biggest mobile win)
+   ═══════════════════════════════════════════════════════════ */
+scene.add(new THREE.HemisphereLight(0x9fc0ff, 0x0c1018, 1.1));
 
 const key = new THREE.DirectionalLight(0xffffff, 2.4);
-key.position.set(7, 11, 9);
-key.castShadow = true;
-key.shadow.mapSize.set(2048, 2048);
-key.shadow.camera.near = 1;
-key.shadow.camera.far = 44;
-key.shadow.camera.left = -9;
-key.shadow.camera.right = 9;
-key.shadow.camera.top = 9;
-key.shadow.camera.bottom = -9;
-key.shadow.bias = -0.0006;
-key.shadow.radius = 3;
+key.position.set(6, 9, 8);
 scene.add(key);
 
-const rim = new THREE.DirectionalLight(0x4d8dff, 2.0);
-rim.position.set(-9, 3, -7);
+const rim = new THREE.DirectionalLight(0x4d8dff, 1.8);
+rim.position.set(-8, 2, -6);
 scene.add(rim);
 
-const fill = new THREE.PointLight(0xff8a4d, 22, 32);
-fill.position.set(4, -5, 6);
+const fill = new THREE.DirectionalLight(0xff9a4d, 0.9);
+fill.position.set(3, -6, 5);
 scene.add(fill);
 
+/* ═══════════════════════════════════════════════════════════
+   4. FLOOR
+   ═══════════════════════════════════════════════════════════ */
 const floor = new THREE.Mesh(
-  new THREE.CircleGeometry(26, 64),
-  new THREE.MeshStandardMaterial({ color: 0x0a0e16, roughness: 0.88, metalness: 0.25 })
+  new THREE.CircleGeometry(20, 32),
+  new THREE.MeshPhongMaterial({ color: 0x0a0e16, shininess: 20 })
 );
 floor.rotation.x = -Math.PI / 2;
 floor.position.y = -3.62;
-floor.receiveShadow = true;
 scene.add(floor);
 
-const grid = new THREE.GridHelper(52, 52, 0x1b2740, 0x111a29);
+const grid = new THREE.GridHelper(40, 40, 0x1b2740, 0x111a29);
 grid.position.y = -3.6;
 grid.material.transparent = true;
-grid.material.opacity = 0.5;
+grid.material.opacity = 0.45;
 scene.add(grid);
 
-/* ══════════════════════════════════════════════════════════════
-   3. SCREEN CANVAS  (the "video" that plays on the display)
-   ══════════════════════════════════════════════════════════════ */
-const SCW = 640, SCH = 1280;
+/* ═══════════════════════════════════════════════════════════
+   5. SCREEN CANVAS (the "video")
+   ═══════════════════════════════════════════════════════════ */
+const SCW = QUALITY.screenW, SCH = QUALITY.screenH;
 const screenCanvas = document.createElement('canvas');
 screenCanvas.width = SCW;
 screenCanvas.height = SCH;
@@ -272,99 +271,86 @@ screenTex.generateMipmaps = false;
 screenTex.minFilter = THREE.LinearFilter;
 screenTex.magFilter = THREE.LinearFilter;
 
-/* user-loaded video (optional) */
 let videoEl = null;
 
-/* --- procedural "video" frame --- */
+/* simplified procedural frame — fewer gradients = faster */
 function drawProcedural(ctx, W, H, t) {
-  const hue = (t * 11) % 360;
+  const hue = (t * 12) % 360;
 
   const g = ctx.createLinearGradient(0, 0, W, H);
-  g.addColorStop(0, `hsl(${hue}, 62%, 36%)`);
-  g.addColorStop(0.5, `hsl(${(hue + 58) % 360}, 68%, 24%)`);
-  g.addColorStop(1, `hsl(${(hue + 155) % 360}, 72%, 14%)`);
+  g.addColorStop(0, `hsl(${hue}, 60%, 34%)`);
+  g.addColorStop(1, `hsl(${(hue + 140) % 360}, 65%, 16%)`);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
 
-  /* soft moving light blobs */
+  /* soft moving blobs */
   ctx.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 6; i++) {
-    const x = W * (0.5 + 0.44 * Math.sin(t * 0.55 + i * 1.9));
-    const y = H * (0.5 + 0.44 * Math.cos(t * 0.41 + i * 2.7));
-    const r = W * (0.34 + 0.12 * Math.sin(t * 0.7 + i));
+  for (let i = 0; i < 3; i++) {
+    const x = W * (0.5 + 0.4 * Math.sin(t * 0.5 + i * 2.1));
+    const y = H * (0.5 + 0.4 * Math.cos(t * 0.4 + i * 2.7));
+    const r = W * 0.42;
     const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
-    rg.addColorStop(0, `hsla(${(hue + i * 62) % 360}, 95%, 62%, 0.34)`);
+    rg.addColorStop(0, `hsla(${(hue + i * 80) % 360}, 90%, 60%, 0.32)`);
     rg.addColorStop(1, 'hsla(0,0%,0%,0)');
     ctx.fillStyle = rg;
     ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.arc(x, y, r, 0, 6.283);
     ctx.fill();
   }
   ctx.globalCompositeOperation = 'source-over';
 
-  /* scrolling scan grid — gives a sense of motion */
+  /* scan lines */
   ctx.strokeStyle = 'rgba(255,255,255,0.05)';
   ctx.lineWidth = 1;
-  const off = (t * 90) % 64;
-  for (let y = -64 + off; y < H; y += 64) {
+  const off = (t * 70) % 40;
+  for (let y = -40 + off; y < H; y += 40) {
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(W, y);
     ctx.stroke();
   }
 
-  /* a bouncing "subject" */
-  const bx = W * (0.5 + 0.3 * Math.sin(t * 0.9));
-  const by = H * (0.62 + 0.06 * Math.sin(t * 1.8));
+  /* bouncing orb */
+  const bx = W * (0.5 + 0.28 * Math.sin(t * 0.85));
+  const by = H * (0.6 + 0.06 * Math.sin(t * 1.7));
   ctx.beginPath();
-  ctx.arc(bx, by, W * 0.11, 0, Math.PI * 2);
-  ctx.fillStyle = `hsla(${(hue + 200) % 360}, 100%, 72%, 0.9)`;
-  ctx.shadowColor = `hsla(${(hue + 200) % 360}, 100%, 70%, 0.9)`;
-  ctx.shadowBlur = 40;
+  ctx.arc(bx, by, W * 0.11, 0, 6.283);
+  ctx.fillStyle = `hsla(${(hue + 200) % 360}, 100%, 70%, 0.9)`;
   ctx.fill();
-  ctx.shadowBlur = 0;
 
   /* title */
   ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(255,255,255,0.96)';
-  ctx.font = `800 ${Math.round(W * 0.088)}px ui-sans-serif, system-ui, sans-serif`;
-  ctx.fillText('SPECTRA OS', W / 2, H * 0.30);
-  ctx.font = `600 ${Math.round(W * 0.040)}px ui-monospace, monospace`;
-  ctx.fillStyle = 'rgba(255,255,255,0.68)';
-  ctx.fillText('LIVE  •  4K  •  HDR', W / 2, H * 0.345);
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.font = `800 ${Math.round(W * 0.09)}px sans-serif`;
+  ctx.fillText('SPECTRA', W / 2, H * 0.30);
+  ctx.font = `600 ${Math.round(W * 0.038)}px monospace`;
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.fillText('LIVE  •  HD', W / 2, H * 0.35);
 
   /* timecode */
   ctx.textAlign = 'left';
-  ctx.font = `600 ${Math.round(W * 0.036)}px ui-monospace, monospace`;
+  ctx.font = `600 ${Math.round(W * 0.038)}px monospace`;
   ctx.fillStyle = 'rgba(255,255,255,0.8)';
-  ctx.fillText(new Date().toLocaleTimeString(), W * 0.06, H * 0.045);
+  const d = new Date();
+  ctx.fillText(
+    String(d.getHours()).padStart(2, '0') + ':' +
+    String(d.getMinutes()).padStart(2, '0'), W * 0.06, H * 0.05);
 
   /* rec dot */
   if (Math.sin(t * 3) > 0) {
     ctx.beginPath();
-    ctx.arc(W * 0.9, H * 0.037, W * 0.013, 0, Math.PI * 2);
+    ctx.arc(W * 0.9, H * 0.04, W * 0.015, 0, 6.283);
     ctx.fillStyle = '#ff4d5e';
     ctx.fill();
   }
-
-  /* progress bar */
-  ctx.fillStyle = 'rgba(255,255,255,0.22)';
-  ctx.fillRect(W * 0.06, H * 0.955, W * 0.88, 5);
-  ctx.fillStyle = 'rgba(255,255,255,0.92)';
-  ctx.fillRect(W * 0.06, H * 0.955, W * 0.88 * ((t * 0.07) % 1), 5);
 }
 
-/* ══════════════════════════════════════════════════════════════
-   4. DAMAGE MODEL
-   ══════════════════════════════════════════════════════════════ */
-const damage = {
-  severity: 0,       // 0 → 1.3  (1 = dead panel)
-  cracks: [],        // { pts:[{x,y}] normalised 0..1 (y down), w }
-  dead: [],          // { x,y,r (normalised), seed, grow }
-};
+/* ═══════════════════════════════════════════════════════════
+   6. DAMAGE (cracks only — no dead pixels / glitch)
+   ═══════════════════════════════════════════════════════════ */
+const damage = { severity: 0, cracks: [] };
 
-/* glass crack overlay canvas */
-const GCW = 512, GCH = 1024;
+const GCW = 256, GCH = 512;
 const glassCanvas = document.createElement('canvas');
 glassCanvas.width = GCW;
 glassCanvas.height = GCH;
@@ -379,96 +365,57 @@ function renderGlassCracks() {
   for (const cr of damage.cracks) {
     if (cr.pts.length < 2) continue;
     gctx.beginPath();
-    cr.pts.forEach((p, i) => i ? gctx.lineTo(p.x * GCW, p.y * GCH) : gctx.moveTo(p.x * GCW, p.y * GCH));
-    gctx.strokeStyle = 'rgba(255,255,255,0.18)';
-    gctx.lineWidth = cr.w * 3.4;
+    cr.pts.forEach((p, i) =>
+      i ? gctx.lineTo(p.x * GCW, p.y * GCH) : gctx.moveTo(p.x * GCW, p.y * GCH));
+    gctx.strokeStyle = 'rgba(255,255,255,0.20)';
+    gctx.lineWidth = cr.w * 3;
     gctx.stroke();
-    gctx.strokeStyle = 'rgba(200,232,255,0.95)';
+    gctx.strokeStyle = 'rgba(210,235,255,0.95)';
     gctx.lineWidth = Math.max(1, cr.w);
     gctx.stroke();
   }
   glassTex.needsUpdate = true;
 }
 
-/* --- draw the whole screen each frame --- */
-function renderScreen(dt, time) {
+function renderScreen(time) {
   const ctx = sctx, W = SCW, H = SCH;
 
-  /* 1 ── video / procedural feed */
   if (videoEl && videoEl.readyState >= 2 && videoEl.videoWidth) {
     const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
     const s = Math.max(W / vw, H / vh);
-    const dw = vw * s, dh = vh * s;
-    ctx.drawImage(videoEl, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    ctx.drawImage(videoEl, (W - vw * s) / 2, (H - vh * s) / 2, vw * s, vh * s);
   } else {
     drawProcedural(ctx, W, H, time);
   }
 
-  /* 2 ── dead pixel regions */
-  for (const d of damage.dead) {
-    const cx = d.x * W, cy = d.y * H, cr = d.r * W;
-    ctx.save();
-    ctx.beginPath();
-    const N = 22;
-    for (let i = 0; i <= N; i++) {
-      const a = (i / N) * Math.PI * 2;
-      const rr = cr * (0.72 + 0.30 * Math.sin(a * 3 + d.seed) + 0.13 * Math.sin(a * 7 + d.seed * 2));
-      const x = cx + Math.cos(a) * rr;
-      const y = cy + Math.sin(a) * rr;
-      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-    }
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(4,5,9,0.97)';
-    ctx.fill();
-    ctx.strokeStyle = `rgba(150,255,225,${0.12 + 0.25 * Math.random() * damage.severity})`;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  /* 3 ── cracks */
+  /* cracks drawn into the screen too */
   ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
   for (const cr of damage.cracks) {
     if (cr.pts.length < 2) continue;
     ctx.beginPath();
-    cr.pts.forEach((p, i) => i ? ctx.lineTo(p.x * W, p.y * H) : ctx.moveTo(p.x * W, p.y * H));
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-    ctx.lineWidth = cr.w + 4;
+    cr.pts.forEach((p, i) =>
+      i ? ctx.lineTo(p.x * W, p.y * H) : ctx.moveTo(p.x * W, p.y * H));
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = cr.w + 3;
     ctx.stroke();
     ctx.strokeStyle = 'rgba(235,246,255,0.92)';
     ctx.lineWidth = cr.w;
     ctx.stroke();
   }
 
-  /* 4 ── glitch bands */
-  if (damage.severity > 0.28) {
-    const bands = Math.min(12, Math.floor(damage.severity * 10));
-    for (let i = 0; i < bands; i++) {
-      if (Math.random() > 0.55) continue;
-      const y = Math.random() * H;
-      const h = 6 + Math.random() * 46;
-      const dx = (Math.random() - 0.5) * 130 * damage.severity;
-      ctx.drawImage(screenCanvas, 0, y, W, h, dx, y, W, h);
-    }
-  }
-
-  /* 5 ── panel failure */
-  if (damage.severity >= 1) {
-    const f = 0.55 + 0.32 * Math.sin(time * 26) + 0.12 * Math.random();
-    ctx.fillStyle = `rgba(0,0,0,${Math.min(0.96, Math.max(0, f))})`;
-    ctx.fillRect(0, 0, W, H);
-  } else if (damage.severity > 0.55) {
-    ctx.fillStyle = `rgba(0,0,0,${(damage.severity - 0.55) * 0.55})`;
+  /* screen fading out as it dies */
+  if (damage.severity > 0.6) {
+    const f = Math.min(0.92, (damage.severity - 0.6) * 1.6);
+    ctx.fillStyle = `rgba(0,0,0,${f})`;
     ctx.fillRect(0, 0, W, H);
   }
 
   screenTex.needsUpdate = true;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   5. BUILD THE PHONE
-   ══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   7. BUILD THE PHONE (simplified geometry + Phong materials)
+   ═══════════════════════════════════════════════════════════ */
 const PW = 3.2, PH = 6.4;
 const phone = new THREE.Group();
 scene.add(phone);
@@ -494,23 +441,58 @@ function registerPart(o) {
   return p;
 }
 
-/* ---------- shared materials ---------- */
-const matMetal  = new THREE.MeshStandardMaterial({ color: 0x9aa3b2, metalness: 0.96, roughness: 0.28 });
-const matDark   = new THREE.MeshStandardMaterial({ color: 0x151922, metalness: 0.55, roughness: 0.6 });
-const matPCB    = new THREE.MeshStandardMaterial({ color: 0x0d4a33, metalness: 0.25, roughness: 0.82 });
-const matChip   = new THREE.MeshStandardMaterial({ color: 0x2a2f3a, metalness: 0.7, roughness: 0.35 });
-const matSilver = new THREE.MeshStandardMaterial({ color: 0xc9d3e0, metalness: 1.0, roughness: 0.18 });
-const matBatt   = new THREE.MeshStandardMaterial({ color: 0x39414f, metalness: 0.6, roughness: 0.45 });
-const matCopper = new THREE.MeshStandardMaterial({ color: 0xb87333, metalness: 0.95, roughness: 0.3 });
+/* materials — Phong for cheap specular highlights */
+const matMetal  = new THREE.MeshPhongMaterial({ color: 0x9aa3b2, specular: 0xffffff, shininess: 90 });
+const matDark   = new THREE.MeshPhongMaterial({ color: 0x151922, shininess: 25 });
+const matPCB    = new THREE.MeshPhongMaterial({ color: 0x0d4a33, shininess: 15 });
+const matChip   = new THREE.MeshPhongMaterial({ color: 0x2a2f3a, specular: 0x8899aa, shininess: 60 });
+const matSilver = new THREE.MeshPhongMaterial({ color: 0xc9d3e0, specular: 0xffffff, shininess: 140 });
+const matBatt   = new THREE.MeshPhongMaterial({ color: 0x39414f, specular: 0x556677, shininess: 40 });
+const matCopper = new THREE.MeshPhongMaterial({ color: 0xb87333, specular: 0xffcc88, shininess: 100 });
+const matBack   = new THREE.MeshPhongMaterial({ color: 0x1a2030, specular: 0xffffff, shininess: 80 });
 
-/* ---------- 5.1 MID-FRAME ---------- */
+/* ---------- PCB texture (bakes traces + pads, saves meshes) ---------- */
+function makePCBTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#0d4a33';
+  g.fillRect(0, 0, 256, 256);
+
+  /* traces */
+  g.strokeStyle = 'rgba(180,210,120,0.35)';
+  g.lineWidth = 2;
+  for (let i = 0; i < 14; i++) {
+    g.beginPath();
+    g.moveTo(Math.random() * 256, Math.random() * 256);
+    let x = Math.random() * 256, y = Math.random() * 256;
+    for (let s = 0; s < 3; s++) {
+      x += (Math.random() - 0.5) * 100;
+      y += (Math.random() - 0.5) * 100;
+      g.lineTo(x, y);
+    }
+    g.stroke();
+  }
+
+  /* solder pads */
+  g.fillStyle = 'rgba(200,220,140,0.55)';
+  for (let i = 0; i < 40; i++) {
+    const x = Math.random() * 256, y = Math.random() * 256;
+    const s = 3 + Math.random() * 4;
+    g.fillRect(x, y, s, s);
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/* ---------- MID-FRAME ---------- */
 const frameGroup = new THREE.Group();
 const FT = 0.18, FD = 0.24;
 function frameBar(w, h, x, y) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, FD), matMetal);
   m.position.set(x, y, 0);
-  m.castShadow = true;
-  m.receiveShadow = true;
   frameGroup.add(m);
 }
 frameBar(FT, PH, -PW / 2 + FT / 2, 0);
@@ -520,199 +502,156 @@ frameBar(PW - FT * 2, FT, 0, -PH / 2 + FT / 2);
 
 const plate = new THREE.Mesh(
   new THREE.BoxGeometry(PW - FT * 2, PH - FT * 2, 0.05),
-  new THREE.MeshStandardMaterial({ color: 0x272c36, metalness: 0.85, roughness: 0.45 })
+  new THREE.MeshPhongMaterial({ color: 0x272c36, shininess: 30 })
 );
 plate.position.z = -0.085;
-plate.receiveShadow = true;
 frameGroup.add(plate);
 
 registerPart({
-  id: 'frame', name: 'Mid-frame', object: frameGroup,
+  id: 'frame', name: 'Frame', object: frameGroup,
   base: new THREE.Vector3(0, 0, 0),
   explode: new THREE.Vector3(0, 0, 0),
-  info: 'Aluminium chassis. It is the skeleton that everything bolts onto, it spreads heat away from the chip, and in most phones it doubles as the main antenna.'
+  info: 'The metal skeleton. Everything bolts onto it, and it helps pull heat away from the chip.'
 });
 
-/* ---------- 5.2 SCREWS ---------- */
-const screwPositions = [
-  [-1.33, 2.72], [1.33, 2.72],
-  [-1.33, 0],    [1.33, 0],
-  [-1.33, -2.72], [1.33, -2.72],
-];
-screwPositions.forEach(([x, y], i) => {
-  const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.05, 18), matSilver);
-  body.rotation.x = Math.PI / 2;
-  body.castShadow = true;
-  g.add(body);
-
-  const slotA = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.018, 0.02), matDark);
-  slotA.position.z = -0.027;
-  g.add(slotA);
-  const slotB = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.11, 0.02), matDark);
-  slotB.position.z = -0.027;
-  g.add(slotB);
-
+/* ---------- SCREWS (4, single mesh each) ---------- */
+[[-1.33, 2.72], [1.33, 2.72], [-1.33, -2.72], [1.33, -2.72]].forEach(([x, y], i) => {
+  const s = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.08, 0.05, QUALITY.segments),
+    matSilver
+  );
+  s.rotation.x = Math.PI / 2;
   registerPart({
-    id: 'screw' + i, name: 'Screw', object: g,
+    id: 'screw' + i, name: 'Screw', object: s,
     base: new THREE.Vector3(x, y, -0.142),
-    explode: new THREE.Vector3(x * 0.28, y * 0.18, -1.4),
+    explode: new THREE.Vector3(x * 0.3, y * 0.2, -1.5),
     label: false,
-    info: 'A pentalobe / Phillips screw. Modern phones use only a handful of them — adhesive does most of the holding.'
+    info: 'Holds the frame together. Phones use only a few — glue does most of the work.'
   });
 });
 
-/* ---------- 5.3 BATTERY ---------- */
+/* ---------- BATTERY ---------- */
 const battGroup = new THREE.Group();
-const battBody = new THREE.Mesh(new THREE.BoxGeometry(1.95, 3.1, 0.16), matBatt);
-battBody.castShadow = true;
-battBody.receiveShadow = true;
-battGroup.add(battBody);
-
-const coil = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.028, 10, 48), matCopper);
+battGroup.add(new THREE.Mesh(new THREE.BoxGeometry(1.95, 3.1, 0.16), matBatt));
+const coil = new THREE.Mesh(
+  new THREE.TorusGeometry(0.6, 0.026, 6, 20),
+  matCopper
+);
 coil.position.z = -0.11;
 battGroup.add(coil);
-
-/* little pouch ridge */
-const ridge = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.04, 0.01),
-  new THREE.MeshStandardMaterial({ color: 0x2a303b, metalness: 0.6, roughness: 0.5 }));
-ridge.position.set(0, 1.35, 0.085);
-battGroup.add(ridge);
 
 registerPart({
   id: 'battery', name: 'Battery', object: battGroup,
   base: new THREE.Vector3(0, -1.15, -0.02),
-  explode: new THREE.Vector3(0, -1.0, -1.1),
-  info: 'Lithium-polymer cell (~4500 mAh). Lithium ions shuttle between the anode and cathode; a fuel-gauge chip and protection circuit keep it from over-charging or venting.'
+  explode: new THREE.Vector3(0, -1.0, -1.2),
+  info: 'Stores the power. Lithium-ion cells inside a sealed pouch.'
 });
 
-/* ---------- 5.4 MOTHERBOARD ---------- */
+/* ---------- MOTHERBOARD ---------- */
 const mbGroup = new THREE.Group();
-const pcb = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.9, 0.06), matPCB);
-pcb.castShadow = true;
-pcb.receiveShadow = true;
+
+const pcb = new THREE.Mesh(
+  new THREE.BoxGeometry(1.9, 1.9, 0.06),
+  new THREE.MeshPhongMaterial({ map: makePCBTexture(), shininess: 15 })
+);
 mbGroup.add(pcb);
 
-/* chips */
-const chipData = [
-  [0.0, 0.28, 0.52, 0.52],
-  [-0.52, 0.55, 0.28, 0.28],
-  [0.52, 0.55, 0.26, 0.26],
-  [-0.55, -0.42, 0.34, 0.26],
-  [0.48, -0.5, 0.3, 0.3],
-];
-chipData.forEach(([x, y, w, h]) => {
-  const chip = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.07), matChip);
-  chip.position.set(x, y, 0.065);
-  chip.castShadow = true;
-  mbGroup.add(chip);
-  const die = new THREE.Mesh(new THREE.BoxGeometry(w * 0.55, h * 0.55, 0.012), matSilver);
-  die.position.set(x, y, 0.106);
-  mbGroup.add(die);
-});
-
-/* tiny passives */
-for (let i = 0; i < 26; i++) {
-  const t = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.02),
-    new THREE.MeshStandardMaterial({ color: 0x7a6a4a, metalness: 0.6, roughness: 0.5 }));
-  t.position.set((Math.random() - 0.5) * 1.7, (Math.random() - 0.5) * 1.7, 0.045);
-  mbGroup.add(t);
-}
+/* 3 chips instead of 5, each with a silver die */
+[[0, 0.3, 0.55, 0.55], [-0.5, -0.45, 0.38, 0.3], [0.5, 0.55, 0.3, 0.3]]
+  .forEach(([x, y, w, h]) => {
+    const chip = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.07), matChip);
+    chip.position.set(x, y, 0.065);
+    mbGroup.add(chip);
+    const die = new THREE.Mesh(new THREE.BoxGeometry(w * 0.55, h * 0.55, 0.012), matSilver);
+    die.position.set(x, y, 0.106);
+    mbGroup.add(die);
+  });
 
 registerPart({
   id: 'motherboard', name: 'Motherboard', object: mbGroup,
   base: new THREE.Vector3(0.35, 2.05, -0.03),
-  explode: new THREE.Vector3(0.5, 1.2, -1.7),
-  info: 'The brain. The SoC (CPU + GPU + NPU), RAM, flash storage, power-management ICs and the 5G / Wi-Fi / Bluetooth radios all live on this board.'
+  explode: new THREE.Vector3(0.5, 1.2, -1.8),
+  info: 'The brain. Processor, memory, storage and radios all live on this board.'
 });
 
-/* ---------- 5.5 CAMERA MODULE ---------- */
+/* ---------- CAMERA ---------- */
 const camGroup = new THREE.Group();
-const camBase = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.86, 0.06), matDark);
-camBase.castShadow = true;
-camGroup.add(camBase);
+camGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.86, 0.06), matDark));
 
-const lensOffsets = [[-0.2, 0.2], [0.2, 0.2], [0, -0.22]];
-lensOffsets.forEach(([x, y]) => {
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.14, 22), matSilver);
+[[-0.2, 0.2], [0.2, 0.2], [0, -0.22]].forEach(([x, y]) => {
+  const barrel = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16, 0.16, 0.14, QUALITY.segments),
+    matSilver
+  );
   barrel.rotation.x = Math.PI / 2;
   barrel.position.set(x, y, -0.1);
-  barrel.castShadow = true;
   camGroup.add(barrel);
-
-  const glass = new THREE.Mesh(new THREE.CircleGeometry(0.13, 22),
-    new THREE.MeshPhysicalMaterial({ color: 0x0a1420, metalness: 0.4, roughness: 0.05, clearcoat: 1 }));
-  glass.position.set(x, y, -0.172);
-  glass.rotation.y = Math.PI;
-  camGroup.add(glass);
 });
 
 registerPart({
-  id: 'camera', name: 'Camera module', object: camGroup,
+  id: 'camera', name: 'Camera', object: camGroup,
   base: new THREE.Vector3(-0.95, 2.45, 0.0),
-  explode: new THREE.Vector3(-1.4, 1.5, -2.3),
-  info: 'Lens stack + image sensor + OIS actuator. Photons hit silicon photodiodes and are converted into electrical charge — millions of tiny light meters per frame.'
+  explode: new THREE.Vector3(-1.4, 1.5, -2.4),
+  info: 'Takes the photos. A lens focuses light onto a sensor, which turns it into a picture.'
 });
 
-/* ---------- 5.6 SPEAKER ---------- */
+/* ---------- SPEAKER ---------- */
 const spkGroup = new THREE.Group();
-const spkBody = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.28, 0.14), matDark);
-spkBody.castShadow = true;
-spkGroup.add(spkBody);
-const spkMembrane = new THREE.Mesh(new THREE.BoxGeometry(1.34, 0.17, 0.02),
-  new THREE.MeshStandardMaterial({ color: 0x3a4150, metalness: 0.4, roughness: 0.8 }));
-spkMembrane.position.z = 0.075;
-spkGroup.add(spkMembrane);
+spkGroup.add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.28, 0.14), matDark));
+const spkMem = new THREE.Mesh(
+  new THREE.BoxGeometry(1.34, 0.17, 0.02),
+  new THREE.MeshPhongMaterial({ color: 0x3a4150, shininess: 10 })
+);
+spkMem.position.z = 0.075;
+spkGroup.add(spkMem);
 
 registerPart({
   id: 'speaker', name: 'Speaker', object: spkGroup,
   base: new THREE.Vector3(0, -2.87, -0.02),
-  explode: new THREE.Vector3(0, -1.5, -1.5),
-  info: 'A coil sits in a magnetic field; when current flows the coil pushes a diaphragm, which pushes air. That pressure wave is what your ear reads as sound.'
+  explode: new THREE.Vector3(0, -1.5, -1.6),
+  info: 'Makes the sound. A coil pushes a thin sheet, which pushes the air around it.'
 });
 
-/* ---------- 5.7 HAPTIC MOTOR ---------- */
-const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.12, 24), matSilver);
+/* ---------- HAPTIC MOTOR ---------- */
+const motor = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.24, 0.24, 0.12, QUALITY.segments),
+  matSilver
+);
 motor.rotation.x = Math.PI / 2;
-motor.castShadow = true;
+
 registerPart({
-  id: 'motor', name: 'Haptic motor', object: motor,
+  id: 'motor', name: 'Vibration motor', object: motor,
   base: new THREE.Vector3(1.06, -2.86, -0.02),
-  explode: new THREE.Vector3(1.4, -1.7, -1.7),
-  info: 'Linear resonant actuator. A small mass is driven back and forth at resonance to create the crisp "tap" you feel when you press the screen.'
+  explode: new THREE.Vector3(1.4, -1.7, -1.8),
+  info: 'Makes the buzz when you tap. A tiny weight shakes inside.'
 });
 
-/* ---------- 5.8 DISPLAY PANEL ---------- */
+/* ---------- DISPLAY ---------- */
 const dispGeo = new THREE.BoxGeometry(PW - 0.2, PH - 0.2, 0.06);
-const screenMat = new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false });
+const screenMat = new THREE.MeshBasicMaterial({ map: screenTex });
 const display = new THREE.Mesh(dispGeo, [
   matDark, matDark, matDark, matDark, screenMat, matDark
 ]);
-display.castShadow = true;
-display.receiveShadow = true;
 
 registerPart({
-  id: 'display', name: 'Display panel', object: display,
+  id: 'display', name: 'Screen', object: display,
   base: new THREE.Vector3(0, 0, 0.17),
   explode: new THREE.Vector3(0, 0, 1.15),
-  info: 'OLED panel. Every pixel is its own light source, so black pixels simply switch off — that is why OLED blacks are perfect and why the panel is so thin.'
+  info: 'Shows the picture. A thin sheet of tiny lights behind the glass.'
 });
 
-/* ---------- 5.9 FRONT GLASS ---------- */
-const matGlass = new THREE.MeshPhysicalMaterial({
-  color: 0xa9c9ff, metalness: 0, roughness: 0.035,
-  transparent: true, opacity: 0.15,
-  clearcoat: 1, clearcoatRoughness: 0.03,
-  side: THREE.DoubleSide, depthWrite: false
+/* ---------- FRONT GLASS ---------- */
+const matGlass = new THREE.MeshPhongMaterial({
+  color: 0xa9c9ff, shininess: 200, specular: 0xffffff,
+  transparent: true, opacity: 0.16, depthWrite: false,
 });
 
 const glassGroup = new THREE.Group();
-const glassPane = new THREE.Mesh(new THREE.BoxGeometry(PW, PH, 0.05), matGlass);
-glassGroup.add(glassPane);
+glassGroup.add(new THREE.Mesh(new THREE.BoxGeometry(PW, PH, 0.05), matGlass));
 
 const crackOverlay = new THREE.Mesh(
   new THREE.PlaneGeometry(PW, PH),
-  new THREE.MeshBasicMaterial({ map: glassTex, transparent: true, depthWrite: false, toneMapped: false })
+  new THREE.MeshBasicMaterial({ map: glassTex, transparent: true, depthWrite: false })
 );
 crackOverlay.position.z = 0.027;
 crackOverlay.userData.pickable = false;
@@ -721,53 +660,41 @@ glassGroup.add(crackOverlay);
 registerPart({
   id: 'frontGlass', name: 'Front glass', object: glassGroup,
   base: new THREE.Vector3(0, 0, 0.245),
-  explode: new THREE.Vector3(0, 0, 2.1),
+  explode: new THREE.Vector3(0, 0, 2.0),
   heatable: true,
   glow: [matGlass],
-  info: 'Chemically hardened glass. It carries the touch layer and protects the panel. It is glued down with a pressure-sensitive adhesive — heat is what lets you lift it.'
+  info: 'Protects the screen. It is glued down — heat it first to remove it.'
 });
 
-/* ---------- 5.10 BACK COVER ---------- */
-const matBack = new THREE.MeshPhysicalMaterial({
-  color: 0x161b26, metalness: 0.55, roughness: 0.26,
-  clearcoat: 1, clearcoatRoughness: 0.12
-});
-
+/* ---------- BACK COVER ---------- */
 const backGroup = new THREE.Group();
-const backPane = new THREE.Mesh(new THREE.BoxGeometry(PW, PH, 0.05), matBack);
-backPane.castShadow = true;
-backPane.receiveShadow = true;
-backGroup.add(backPane);
+backGroup.add(new THREE.Mesh(new THREE.BoxGeometry(PW, PH, 0.05), matBack));
 
-/* camera bump */
 const bump = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, 0.1),
-  new THREE.MeshStandardMaterial({ color: 0x101420, metalness: 0.8, roughness: 0.3 }));
+  new THREE.MeshPhongMaterial({ color: 0x101420, shininess: 40 }));
 bump.position.set(-0.95, 2.45, -0.075);
-bump.castShadow = true;
 backGroup.add(bump);
 
-lensOffsets.forEach(([x, y]) => {
-  const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.05, 24), matSilver);
+[[-0.2, 0.2], [0.2, 0.2], [0, -0.22]].forEach(([x, y]) => {
+  const lens = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.17, 0.17, 0.05, QUALITY.segments),
+    matSilver
+  );
   lens.rotation.x = Math.PI / 2;
   lens.position.set(-0.95 + x, 2.45 + y, -0.14);
   backGroup.add(lens);
 });
 
-/* brand ring */
-const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.012, 8, 40), matMetal);
-ring.position.set(0, -0.4, -0.03);
-backGroup.add(ring);
-
 registerPart({
   id: 'backCover', name: 'Back cover', object: backGroup,
   base: new THREE.Vector3(0, 0, -0.19),
-  explode: new THREE.Vector3(0, 0, -2.1),
+  explode: new THREE.Vector3(0, 0, -2.0),
   heatable: true,
   glow: [matBack],
-  info: 'Glass (or polymer) back. It is bonded to the frame with adhesive to keep dust and water out — which is exactly why a heat mat comes first in every teardown.'
+  info: 'The back shell. Glued on to keep dust and water out.'
 });
 
-/* ---------- pickable mesh cache ---------- */
+/* ---------- pickables ---------- */
 const pickables = [];
 phone.traverse(o => {
   if (o.isMesh && o.userData.pickable !== false) pickables.push(o);
@@ -784,16 +711,14 @@ parts.forEach(p => {
   p.el = d;
 });
 
-/* ══════════════════════════════════════════════════════════════
-   6. INTERACTION STATE
-   ══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   8. INTERACTION
+   ═══════════════════════════════════════════════════════════ */
 let tool = 'inspect';
-let explodeTarget = 0;
-let explodeCur = 0;
+let explodeTarget = 0, explodeCur = 0;
 
 const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2(0, 0);
-let pointerInside = false;
+const pointer = new THREE.Vector2();
 
 let down = null;
 let cutting = false;
@@ -801,10 +726,9 @@ let currentCut = null;
 let hoverHeatPart = null;
 let selectedPart = null;
 
-function setPointer(e) {
-  pointer.x = (e.clientX / innerWidth) * 2 - 1;
-  pointer.y = -(e.clientY / innerHeight) * 2 + 1;
-  pointerInside = true;
+function setPointer(clientX, clientY) {
+  pointer.x = (clientX / innerWidth) * 2 - 1;
+  pointer.y = -(clientY / innerHeight) * 2 + 1;
 }
 
 function pick() {
@@ -830,7 +754,7 @@ function toast(msg) {
   toastEl.textContent = msg;
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2800);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
 }
 
 /* ---------- info panel ---------- */
@@ -854,55 +778,48 @@ function updateHeatBar() {
   const v = Math.round(selectedPart.heat * 100);
   heatFill.style.width = v + '%';
   heatLabel.textContent = v >= 100
-    ? 'ADHESIVE SOFTENED ✓ — PRY IT OFF'
-    : `ADHESIVE ${v}% SOFTENED`;
+    ? 'GLUE SOFTENED ✓ — PRY IT OFF'
+    : `GLUE ${v}% SOFTENED`;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   7. DAMAGE ACTIONS
-   ══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   9. DAMAGE ACTIONS
+   ═══════════════════════════════════════════════════════════ */
 function addCut(uv) {
   const x = uv.x, y = 1 - uv.y;
   if (!currentCut) {
-    currentCut = { pts: [{ x, y }], w: 2.6 };
+    currentCut = { pts: [{ x, y }], w: 2.4 };
     damage.cracks.push(currentCut);
   } else {
     const last = currentCut.pts[currentCut.pts.length - 1];
-    if (Math.hypot(x - last.x, y - last.y) * SCW > 12) {
+    if (Math.hypot(x - last.x, y - last.y) * SCW > 10) {
       currentCut.pts.push({ x, y });
     }
   }
-  damage.severity = Math.min(1.3, damage.severity + 0.010);
+  damage.severity = Math.min(1, damage.severity + 0.012);
 }
 
 function finishCut() {
   if (!currentCut) return;
   const pts = currentCut.pts;
   if (pts.length >= 2) {
-    /* branching fractures */
-    const branches = 2 + Math.floor(Math.random() * 3);
+    /* small branches */
+    const branches = 2 + Math.floor(Math.random() * 2);
     for (let i = 0; i < branches; i++) {
       const base = pts[Math.floor(Math.random() * pts.length)];
       const a = Math.random() * Math.PI * 2;
-      const len = 0.06 + Math.random() * 0.16;
+      const len = 0.05 + Math.random() * 0.12;
       const bp = [{ x: base.x, y: base.y }];
       let cx = base.x, cy = base.y;
       for (let s = 0; s < 3; s++) {
-        const aa = a + (Math.random() - 0.5) * 1.3;
+        const aa = a + (Math.random() - 0.5) * 1.2;
         cx += Math.cos(aa) * len / 3;
         cy += Math.sin(aa) * len / 3;
         bp.push({ x: cx, y: cy });
       }
-      damage.cracks.push({ pts: bp, w: 1.4 + Math.random() * 1.4 });
+      damage.cracks.push({ pts: bp, w: 1.3 + Math.random() * 1.2 });
     }
-    /* dead pixels start spreading from the cut */
-    damage.dead.push({
-      x: pts[0].x, y: pts[0].y,
-      r: 0.02 + Math.random() * 0.025,
-      seed: Math.random() * 10,
-      grow: 0.006
-    });
-    damage.severity = Math.min(1.3, damage.severity + 0.09);
+    damage.severity = Math.min(1, damage.severity + 0.08);
     renderGlassCracks();
   }
   currentCut = null;
@@ -910,48 +827,46 @@ function finishCut() {
 
 function shatter(uv) {
   const x = uv.x, y = 1 - uv.y;
-  const n = 9 + Math.floor(Math.random() * 6);
+  const n = 6 + Math.floor(Math.random() * 4);
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2;
-    const len = 0.10 + Math.random() * 0.34;
+    const len = 0.10 + Math.random() * 0.30;
     const pts = [{ x, y }];
     let cx = x, cy = y;
-    const segs = 5 + Math.floor(Math.random() * 4);
+    const segs = 4 + Math.floor(Math.random() * 3);
     for (let s = 0; s < segs; s++) {
-      const aa = a + (Math.random() - 0.5) * 0.95;
+      const aa = a + (Math.random() - 0.5) * 0.9;
       cx += Math.cos(aa) * len / segs;
       cy += Math.sin(aa) * len / segs;
       pts.push({ x: cx, y: cy });
     }
-    damage.cracks.push({ pts, w: 2 + Math.random() * 3 });
+    damage.cracks.push({ pts, w: 1.8 + Math.random() * 2.5 });
   }
   /* concentric ring */
   const ringPts = [];
-  const R = 0.05 + Math.random() * 0.08;
-  for (let i = 0; i <= 24; i++) {
-    const a = (i / 24) * Math.PI * 2;
+  const R = 0.04 + Math.random() * 0.07;
+  for (let i = 0; i <= 20; i++) {
+    const a = (i / 20) * Math.PI * 2;
     const rr = R * (0.75 + 0.35 * Math.random());
     ringPts.push({ x: x + Math.cos(a) * rr, y: y + Math.sin(a) * rr * 1.2 });
   }
-  damage.cracks.push({ pts: ringPts, w: 2.4 });
+  damage.cracks.push({ pts: ringPts, w: 2.2 });
 
-  damage.dead.push({ x, y, r: 0.035, seed: Math.random() * 10, grow: 0.014 });
-  damage.severity = Math.min(1.3, damage.severity + 0.26);
+  damage.severity = Math.min(1, damage.severity + 0.24);
   renderGlassCracks();
-  toast('Impact! The glass shattered and the panel underneath is dying.');
+  toast('Smash! The glass cracked.');
 }
 
 function repairScreen() {
   damage.severity = 0;
   damage.cracks.length = 0;
-  damage.dead.length = 0;
   renderGlassCracks();
-  toast('Screen replaced. Damage cleared.');
+  toast('Screen replaced.');
 }
 
-/* ══════════════════════════════════════════════════════════════
-   8. TOOL ACTIONS
-   ══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   10. TOOL ACTIONS
+   ═══════════════════════════════════════════════════════════ */
 function detachPart(p, target, rotEuler) {
   p.removed = true;
   p.detachTarget.copy(target);
@@ -964,77 +879,52 @@ function screwsRemaining() {
 
 function tryPry(p) {
   if (p.id === 'backCover') {
-    if (p.heat < 1) {
-      toast('Adhesive is too strong. Heat the back cover first (Heat Gun).');
-      return;
-    }
-    if (screwsRemaining() > 0) {
-      toast(`${screwsRemaining()} screws are still holding the frame. Remove them first.`);
-      return;
-    }
+    if (p.heat < 1) return toast('Glue too strong. Heat the back cover first.');
+    if (screwsRemaining() > 0)
+      return toast(`${screwsRemaining()} screws still holding. Remove them first.`);
     detachPart(p, new THREE.Vector3(0, -0.6, -5.5), new THREE.Vector3(-0.5, 0.35, 0.25));
-    toast('Back cover removed. The internals are exposed.');
-    return;
+    return toast('Back cover off. Internals exposed.');
   }
-
   if (p.id === 'frontGlass') {
-    if (p.heat < 1) {
-      toast('Adhesive is too strong. Heat the front glass first (Heat Gun).');
-      return;
-    }
+    if (p.heat < 1) return toast('Glue too strong. Heat the front glass first.');
     detachPart(p, new THREE.Vector3(0, 0.4, 6.2), new THREE.Vector3(0.35, -0.5, 0.2));
-    toast('Front glass lifted off. The display panel is underneath.');
-    return;
+    return toast('Front glass lifted. Screen underneath.');
   }
-
   if (p.id === 'display') {
-    if (!partById.frontGlass.removed) {
-      toast('The front glass is still on top. Remove it first.');
-      return;
-    }
+    if (!partById.frontGlass.removed)
+      return toast('Front glass is still on top. Remove it first.');
     detachPart(p, new THREE.Vector3(0, 0.3, 4.0), new THREE.Vector3(0.2, 0.4, 0));
-    toast('Display panel freed. Note the thin flex cable at the bottom.');
-    return;
+    return toast('Screen freed.');
   }
-
-  if (p.id === 'battery') {
-    toast('The battery is glued in with stretch-release tape — use the explode slider to lift it out.');
-    return;
-  }
-
-  toast('That part is fastened in place. Use the Explode slider to separate the layers.');
+  toast('That part is held in place. Use the SPLIT slider.');
 }
 
 function tryUnscrew(p) {
-  if (!p.id.startsWith('screw')) {
-    toast('Point the screwdriver at a screw.');
-    return;
-  }
+  if (!p.id.startsWith('screw')) return toast('Point the screwdriver at a screw.');
   if (p.removed) return;
 
   p.removed = true;
-  p.spin = 26;
+  p.spin = 24;
   p.detachTarget.set(
-    p.base.x * 0.6 + (Math.random() - 0.5) * 1.6,
-    p.base.y * 0.5 + (Math.random() - 0.5) * 1.6,
+    p.base.x * 0.6 + (Math.random() - 0.5) * 1.4,
+    p.base.y * 0.5 + (Math.random() - 0.5) * 1.4,
     -3.4
   );
   p.rotTarget.set(Math.random() * 4, Math.random() * 4, Math.random() * 4);
 
   const left = screwsRemaining();
-  toast(left > 0
-    ? `Screw out. ${left} remaining.`
-    : 'All screws removed — the frame is now free.');
+  toast(left > 0 ? `Screw out. ${left} left.` : 'All screws out — frame is free.');
 }
 
-/* ══════════════════════════════════════════════════════════════
-   9. POINTER EVENTS
-   ══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   11. POINTER / TOUCH EVENTS
+   ═══════════════════════════════════════════════════════════ */
 const dom = renderer.domElement;
+dom.style.touchAction = 'none';
 
 dom.addEventListener('pointerdown', e => {
-  if (e.button !== 0) return;
-  setPointer(e);
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  setPointer(e.clientX, e.clientY);
   down = { x: e.clientX, y: e.clientY, t: performance.now(), moved: false };
 
   if (tool === 'knife') {
@@ -1045,13 +935,16 @@ dom.addEventListener('pointerdown', e => {
       controls.enabled = false;
       currentCut = null;
       addCut(h.uv);
+      try { dom.setPointerCapture(e.pointerId); } catch(_) {}
     }
   }
-}, { capture: true });
+});
 
 dom.addEventListener('pointermove', e => {
-  setPointer(e);
-  if (down && !down.moved && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) {
+  if (!pointer.length) return;
+  setPointer(e.clientX, e.clientY);
+
+  if (down && !down.moved && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) {
     down.moved = true;
   }
   if (cutting) {
@@ -1061,26 +954,26 @@ dom.addEventListener('pointermove', e => {
   }
 });
 
-window.addEventListener('pointerup', e => {
+function endPointer(e) {
   if (cutting) {
     cutting = false;
     controls.enabled = true;
     if (currentCut) {
       finishCut();
-      toast('You cut through the panel. Dead pixels are spreading from the cut.');
+      toast('You cut through the panel.');
     }
     down = null;
     return;
   }
-  if (down && !down.moved && performance.now() - down.t < 600) {
-    handleClick();
+  if (down && !down.moved && performance.now() - down.t < 500) {
+    handleTap();
   }
   down = null;
-});
+}
+dom.addEventListener('pointerup', endPointer);
+dom.addEventListener('pointercancel', endPointer);
 
-dom.addEventListener('pointerleave', () => { pointerInside = false; });
-
-function handleClick() {
+function handleTap() {
   const hits = pick();
   if (!hits.length) {
     if (tool === 'inspect') { infoEl.classList.remove('show'); selectedPart = null; }
@@ -1091,77 +984,59 @@ function handleClick() {
   if (!p) return;
 
   switch (tool) {
-    case 'inspect':
-      showInfo(p);
-      break;
-
-    case 'pry':
-      tryPry(p);
-      break;
-
-    case 'screw':
-      tryUnscrew(p);
-      break;
-
+    case 'inspect': showInfo(p); break;
+    case 'pry':     tryPry(p); break;
+    case 'screw':   tryUnscrew(p); break;
     case 'hammer':
       if (p.id === 'display' || p.id === 'frontGlass') shatter(h.uv);
       else toast('Aim the hammer at the screen.');
       break;
-
     case 'knife':
       if (p.id === 'display' || p.id === 'frontGlass') {
-        addCut(h.uv);
-        finishCut();
-        toast('Scored the panel with the blade.');
+        addCut(h.uv); finishCut();
+        toast('Scored the screen.');
       } else toast('Run the blade across the screen.');
       break;
-
     case 'heat':
-      toast('Hover over the back cover or front glass to heat the adhesive.');
+      toast('Drag over the back cover or front glass to heat it.');
       break;
   }
 }
 
-/* ══════════════════════════════════════════════════════════════
-   10. TOOLBAR UI
-   ══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   12. TOOLBAR & BOTTOM UI
+   ═══════════════════════════════════════════════════════════ */
 const toolButtons = [...document.querySelectorAll('#tools button')];
 toolButtons.forEach(btn => {
   btn.addEventListener('click', () => {
     toolButtons.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     tool = btn.dataset.tool;
-    dom.style.cursor = tool === 'inspect' ? 'grab' : 'crosshair';
 
     const hints = {
-      inspect: 'Click a component to read what it does.',
-      heat: 'Hover over a glued panel to soften the adhesive.',
-      pry: 'Click a heated panel to lift it off.',
-      screw: 'Click each screw to unscrew it.',
-      knife: 'Drag across the screen to slice the panel.',
-      hammer: 'Click the screen to smash it.',
+      inspect: 'Tap a part to learn what it does.',
+      heat:    'Drag over a glued panel to soften the glue.',
+      pry:     'Tap a heated panel to lift it off.',
+      screw:   'Tap each screw to unscrew it.',
+      knife:   'Drag across the screen to slice it.',
+      hammer:  'Tap the screen to smash it.',
     };
     toast(hints[tool]);
   });
 });
-dom.style.cursor = 'grab';
 
-/* explode slider */
 const slider = document.getElementById('explode');
 slider.addEventListener('input', () => {
   explodeTarget = slider.value / 100;
 });
 
-/* auto explode */
 let autoDir = 0;
 document.getElementById('autoBtn').addEventListener('click', () => {
   autoDir = explodeTarget > 0.5 ? -1 : 1;
 });
 
-/* repair */
 document.getElementById('repairBtn').addEventListener('click', repairScreen);
 
-/* custom video */
 document.getElementById('videoFile').addEventListener('change', e => {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
@@ -1172,23 +1047,23 @@ document.getElementById('videoFile').addEventListener('change', e => {
   videoEl.muted = true;
   videoEl.playsInline = true;
   videoEl.play().catch(() => {});
-  toast('Video loaded — now break the screen and watch it die.');
+  toast('Video loaded. Now try breaking the screen.');
 });
 
-/* ══════════════════════════════════════════════════════════════
-   11. PER-FRAME UPDATES
-   ══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   13. FRAME UPDATES
+   ═══════════════════════════════════════════════════════════ */
 function updateExplode(dt) {
   if (autoDir !== 0) {
-    explodeTarget = THREE.MathUtils.clamp(explodeTarget + autoDir * dt * 0.55, 0, 1);
+    explodeTarget = THREE.MathUtils.clamp(explodeTarget + autoDir * dt * 0.5, 0, 1);
     slider.value = Math.round(explodeTarget * 100);
     if (explodeTarget <= 0 || explodeTarget >= 1) autoDir = 0;
   }
-  explodeCur += (explodeTarget - explodeCur) * (1 - Math.pow(0.0015, dt));
+  explodeCur += (explodeTarget - explodeCur) * (1 - Math.pow(0.002, dt));
 }
 
 function updateHeat(dt) {
-  if (tool === 'heat' && pointerInside) {
+  if (tool === 'heat') {
     raycaster.setFromCamera(pointer, camera);
     const hits = raycaster.intersectObjects(pickables, false);
     let hovered = null;
@@ -1203,50 +1078,39 @@ function updateHeat(dt) {
 
   for (const p of parts) {
     if (!p.heatable) continue;
-    const target = (p === hoverHeatPart) ? 1 : 0;
-    if (target === 1) {
-      p.heat = Math.min(1, p.heat + dt * 0.55);
-      if (p.heat >= 1 && !p._softNotified) {
-        p._softNotified = true;
-        toast(`${p.name} adhesive softened — pry it off now.`);
+    if (p === hoverHeatPart) {
+      p.heat = Math.min(1, p.heat + dt * 0.6);
+      if (p.heat >= 1 && !p._notified) {
+        p._notified = true;
+        toast(`${p.name} glue softened — pry it off.`);
       }
     } else if (p.heat > 0) {
-      p.heat = Math.max(0, p.heat - dt * 0.12);
-      if (p.heat < 1) p._softNotified = false;
+      p.heat = Math.max(0, p.heat - dt * 0.15);
+      if (p.heat < 1) p._notified = false;
     }
-
-    /* orange glow */
     const g = p.heat;
     for (const m of p.glow) {
-      if (m.emissive) m.emissive.setRGB(g * 0.85, g * 0.28, g * 0.04);
+      if (m.emissive) m.emissive.setRGB(g * 0.8, g * 0.25, g * 0.03);
     }
   }
-
   if (selectedPart && selectedPart.heatable) updateHeatBar();
 }
 
 function updateParts(dt) {
-  const k = 1 - Math.pow(0.0008, dt);
+  const k = 1 - Math.pow(0.001, dt);
   for (const p of parts) {
-    /* detach motion */
     p.detach.lerp(p.detachTarget, k);
     p.rot.x += (p.rotTarget.x - p.rot.x) * k;
     p.rot.y += (p.rotTarget.y - p.rot.y) * k;
     p.rot.z += (p.rotTarget.z - p.rot.z) * k;
 
-    /* screw spin */
     if (p.spin > 0.02) {
       p.object.rotation.z += p.spin * dt;
       p.spin *= Math.pow(0.08, dt);
-    } else if (p.id.startsWith('screw')) {
-      p.object.rotation.set(p.rot.x, p.rot.y, p.object.rotation.z);
-    }
-
-    if (!p.id.startsWith('screw')) {
+    } else if (!p.id.startsWith('screw')) {
       p.object.rotation.set(p.rot.x, p.rot.y, p.rot.z);
     }
 
-    /* position = base + explode * amount + detach */
     p.object.position.copy(p.base)
       .addScaledVector(p.explode, explodeCur)
       .add(p.detach);
@@ -1254,7 +1118,7 @@ function updateParts(dt) {
 }
 
 function updateLabels() {
-  const show = explodeCur > 0.16;
+  const show = explodeCur > 0.18;
   for (const p of parts) {
     if (!p.el) continue;
     if (!show || p.removed) { p.el.style.opacity = 0; continue; }
@@ -1267,18 +1131,15 @@ function updateLabels() {
   }
 }
 
-function updateDamage(dt) {
-  /* dead zones slowly creep outward */
-  for (const d of damage.dead) {
-    d.r += d.grow * dt * 0.55;
-  }
-}
-
-/* ══════════════════════════════════════════════════════════════
-   12. MAIN LOOP
-   ══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   14. MAIN LOOP (with mobile frame-skip for screen redraw)
+   ═══════════════════════════════════════════════════════════ */
 let last = performance.now();
 let elapsed = 0;
+let screenAccum = 0;
+let fpsAccum = 0, fpsFrames = 0;
+const fpsEl = document.getElementById('fps').querySelector('span');
+const screenInterval = 1 / QUALITY.screenFps;
 
 function animate() {
   requestAnimationFrame(animate);
@@ -1291,28 +1152,51 @@ function animate() {
   updateExplode(dt);
   updateHeat(dt);
   updateParts(dt);
-  updateDamage(dt);
-  renderScreen(dt, elapsed);
+
+  /* throttle screen canvas redraw */
+  screenAccum += dt;
+  if (screenAccum >= screenInterval) {
+    screenAccum = 0;
+    renderScreen(elapsed);
+  }
+
   updateLabels();
 
   controls.update();
   renderer.render(scene, camera);
+
+  /* fps counter */
+  fpsAccum += dt;
+  fpsFrames++;
+  if (fpsAccum >= 1) {
+    fpsEl.textContent = Math.round(fpsFrames / fpsAccum);
+    fpsAccum = 0;
+    fpsFrames = 0;
+  }
 }
 
-/* ══════════════════════════════════════════════════════════════
-   13. RESIZE + BOOT
-   ══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   15. RESIZE + BOOT
+   ═══════════════════════════════════════════════════════════ */
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  framePhone();
 });
+
+addEventListener('orientationchange', () => setTimeout(() => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  framePhone();
+}, 300));
 
 renderGlassCracks();
 showInfo(partById.display);
 animate();
 
-setTimeout(() => toast('Tip: use the Explode slider, then click any part to learn what it does.'), 1400);
+setTimeout(() => toast('Tip: drag the SPLIT slider to take it apart.'), 1400);
 </script>
 </body>
 </html>
