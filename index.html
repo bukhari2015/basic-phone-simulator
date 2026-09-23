@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#070a11" />
-<title>PhoneLab — Persistent Heat</title>
+<title>PhoneLab — Scissors Edition</title>
 <style>
   :root{
     --bg:#070a11; --panel:rgba(15,21,33,0.88); --line:rgba(120,160,255,0.18);
@@ -34,10 +34,10 @@
   #tools{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);
     display:flex;gap:4px;padding:6px;max-width:96vw;flex-wrap:wrap;justify-content:center;}
   #tools button{all:unset;cursor:pointer;display:flex;flex-direction:column;
-    align-items:center;gap:2px;padding:8px 10px;border-radius:10px;
+    align-items:center;gap:2px;padding:8px 9px;border-radius:10px;
     font-size:9px;font-weight:600;color:var(--dim);transition:.15s;
-    border:1px solid transparent;min-width:50px;}
-  #tools button span{font-size:19px;line-height:1;filter:grayscale(1) opacity(.65);}
+    border:1px solid transparent;min-width:48px;}
+  #tools button span{font-size:18px;line-height:1;filter:grayscale(1) opacity(.65);}
   #tools button.active{background:rgba(77,163,255,.16);color:#fff;
     border-color:rgba(77,163,255,.45);}
   #tools button.active span{filter:none;}
@@ -113,7 +113,7 @@
 <div id="ui">
   <div id="header">
     <h1>PHONE<span>LAB</span></h1>
-    <p>Teardown simulator · heat stays hot</p>
+    <p>Teardown + LCD damage simulator</p>
   </div>
 
   <div id="fps" class="panel">FPS <span>—</span></div>
@@ -124,7 +124,8 @@
     <button data-tool="heat"><span>🔥</span>Heat</button>
     <button data-tool="pry"><span>🪛</span>Pry</button>
     <button data-tool="screw"><span>🔧</span>Screw</button>
-    <button data-tool="knife"><span>🔪</span>Cut</button>
+    <button data-tool="knife"><span>🔪</span>Slice</button>
+    <button data-tool="scissors"><span>✂️</span>Scissors</button>
     <button data-tool="hammer"><span>🔨</span>Smash</button>
   </div>
 
@@ -331,10 +332,17 @@ function drawProcedural(ctx, W, H, t) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   6. DAMAGE
+   6. DAMAGE MODEL — cracks + cut chunks + scissors draft
    ═══════════════════════════════════════════════════════════ */
-const damage = { severity: 0, cracks: [] };
+const damage = {
+  severity: 0,
+  cracks: [],
+  chunks: [],   // { x, y, w, h, hue, seed, age }
+};
 
+let scissorsDraft = null; // { x1, y1, x2, y2 } in UV coords (0..1, y down)
+
+/* ---------- glass overlay (cracks) ---------- */
 const GCW = 256, GCH = 512;
 const glassCanvas = document.createElement('canvas');
 glassCanvas.width = GCW;
@@ -347,6 +355,8 @@ function renderGlassCracks() {
   gctx.clearRect(0, 0, GCW, GCH);
   gctx.lineCap = 'round';
   gctx.lineJoin = 'round';
+
+  /* cracks */
   for (const cr of damage.cracks) {
     if (cr.pts.length < 2) continue;
     gctx.beginPath();
@@ -359,12 +369,101 @@ function renderGlassCracks() {
     gctx.lineWidth = Math.max(1, cr.w);
     gctx.stroke();
   }
+
+  /* chunk outlines — thick glowing border on the glass */
+  for (const c of damage.chunks) {
+    const x = c.x * GCW, y = c.y * GCH;
+    const w = c.w * GCW, h = c.h * GCH;
+    gctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    gctx.lineWidth = 5;
+    gctx.strokeRect(x, y, w, h);
+    gctx.strokeStyle = 'rgba(230,245,255,1)';
+    gctx.lineWidth = 2;
+    gctx.strokeRect(x, y, w, h);
+  }
+
   glassTex.needsUpdate = true;
+}
+
+/* ---------- LCD damage rendering for a cut chunk ---------- */
+function drawChunk(ctx, c, W, H, time) {
+  const x = c.x * W;
+  const y = c.y * H;
+  const w = c.w * W;
+  const h = c.h * H;
+  if (w < 2 || h < 2) return;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+
+  /* 1 — rainbow LCD bleed (like a broken iPhone) */
+  const hueShift = (c.hue + time * 25) % 360;
+  const rg = ctx.createLinearGradient(x, y, x + w, y + h);
+  rg.addColorStop(0.00, `hsl(${(hueShift +   0) % 360}, 95%, 58%)`);
+  rg.addColorStop(0.20, `hsl(${(hueShift +  60) % 360}, 95%, 58%)`);
+  rg.addColorStop(0.40, `hsl(${(hueShift + 130) % 360}, 95%, 58%)`);
+  rg.addColorStop(0.60, `hsl(${(hueShift + 200) % 360}, 95%, 58%)`);
+  rg.addColorStop(0.80, `hsl(${(hueShift + 270) % 360}, 95%, 58%)`);
+  rg.addColorStop(1.00, `hsl(${(hueShift + 340) % 360}, 95%, 58%)`);
+  ctx.fillStyle = rg;
+  ctx.fillRect(x, y, w, h);
+
+  /* 2 — horizontal white/black scan bands (flickering) */
+  const bandCount = 12 + (c.seed % 4);
+  const bandH = h / bandCount;
+  for (let i = 0; i < bandCount; i++) {
+    const by = y + i * bandH;
+    const flicker = 0.75 + 0.25 * Math.sin(time * 8 + i * 1.7 + c.seed);
+    if (i % 2 === 0) {
+      ctx.fillStyle = `rgba(0,0,0,${0.55 * flicker})`;
+      ctx.fillRect(x, by, w, bandH * 0.5);
+    } else {
+      ctx.fillStyle = `rgba(255,255,255,${0.42 * flicker})`;
+      ctx.fillRect(x, by, w, bandH * 0.35);
+    }
+  }
+
+  /* 3 — static noise speckles */
+  const noiseCount = Math.min(60, Math.floor(w * h / 120));
+  for (let i = 0; i < noiseCount; i++) {
+    const nx = x + Math.random() * w;
+    const ny = y + Math.random() * h;
+    const nw = 1 + Math.random() * 4;
+    const nh = 1 + Math.random() * 2;
+    ctx.fillStyle = Math.random() > 0.5
+      ? `rgba(255,255,255,${0.4 + Math.random() * 0.4})`
+      : `rgba(0,0,0,${0.4 + Math.random() * 0.4})`;
+    ctx.fillRect(nx, ny, nw, nh);
+  }
+
+  /* 4 — dark corner fade (dead zone feel) */
+  const cg = ctx.createRadialGradient(
+    x + w / 2, y + h / 2, Math.min(w, h) * 0.15,
+    x + w / 2, y + h / 2, Math.max(w, h) * 0.65
+  );
+  cg.addColorStop(0, 'rgba(0,0,0,0)');
+  cg.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = cg;
+  ctx.fillRect(x, y, w, h);
+
+  ctx.restore();
+
+  /* 5 — bright cut edges on top */
+  ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+  ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
+  ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
 }
 
 function renderScreen(time) {
   const ctx = sctx, W = SCW, H = SCH;
 
+  /* 1 — base video / procedural feed */
   if (videoEl && videoEl.readyState >= 2 && videoEl.videoWidth) {
     const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
     const s = Math.max(W / vw, H / vh);
@@ -373,6 +472,10 @@ function renderScreen(time) {
     drawProcedural(ctx, W, H, time);
   }
 
+  /* 2 — cut chunks (rainbow / white-black LCD damage) */
+  for (const c of damage.chunks) drawChunk(ctx, c, W, H, time);
+
+  /* 3 — cracks on top of the screen */
   ctx.lineCap = 'round';
   for (const cr of damage.cracks) {
     if (cr.pts.length < 2) continue;
@@ -387,6 +490,36 @@ function renderScreen(time) {
     ctx.stroke();
   }
 
+  /* 4 — scissors rectangle preview */
+  if (scissorsDraft) {
+    const { x1, y1, x2, y2 } = scissorsDraft;
+    const rx = Math.min(x1, x2) * W;
+    const ry = Math.min(y1, y2) * H;
+    const rw = Math.abs(x2 - x1) * W;
+    const rh = Math.abs(y2 - y1) * H;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(120,220,255,0.16)';
+    ctx.fillRect(rx, ry, rw, rh);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 7]);
+    ctx.lineDashOffset = -time * 40;
+    ctx.strokeRect(rx, ry, rw, rh);
+    ctx.setLineDash([]);
+
+    /* corner markers */
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    const cs = 6;
+    ctx.fillRect(rx - cs / 2, ry - cs / 2, cs, cs);
+    ctx.fillRect(rx + rw - cs / 2, ry - cs / 2, cs, cs);
+    ctx.fillRect(rx - cs / 2, ry + rh - cs / 2, cs, cs);
+    ctx.fillRect(rx + rw - cs / 2, ry + rh - cs / 2, cs, cs);
+    ctx.restore();
+  }
+
+  /* 5 — panel fade-out as severity climbs */
   if (damage.severity > 0.6) {
     const f = Math.min(0.92, (damage.severity - 0.6) * 1.6);
     ctx.fillStyle = `rgba(0,0,0,${f})`;
@@ -684,15 +817,15 @@ parts.forEach(p => {
 /* ═══════════════════════════════════════════════════════════
    8. INTERACTION STATE
    ═══════════════════════════════════════════════════════════ */
-let tool = 'all';                 // ← start in ALL mode
+let tool = 'all';
 let explodeTarget = 0, explodeCur = 0;
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2(0, 0);
-let pointerValid = false;
 
 let down = null;
-let cutting = false;
+let cutting = false;      // knife free-form slicing
+let scissoring = false;   // scissors rectangle cut
 let currentCut = null;
 let hoverHeatPart = null;
 let selectedPart = null;
@@ -700,7 +833,6 @@ let selectedPart = null;
 function setPointer(clientX, clientY) {
   pointer.x = (clientX / innerWidth) * 2 - 1;
   pointer.y = -(clientY / innerHeight) * 2 + 1;
-  pointerValid = true;
 }
 
 function pick() {
@@ -800,6 +932,63 @@ function finishCut() {
   currentCut = null;
 }
 
+/* ---------- commit a scissors rectangle cut ---------- */
+function commitScissorsCut() {
+  if (!scissorsDraft) return;
+  const { x1, y1, x2, y2 } = scissorsDraft;
+  const cx = Math.min(x1, x2);
+  const cy = Math.min(y1, y2);
+  const cw = Math.abs(x2 - x1);
+  const ch = Math.abs(y2 - y1);
+
+  /* ignore tiny drafts */
+  if (cw < 0.04 || ch < 0.04) {
+    scissorsDraft = null;
+    return;
+  }
+
+  damage.chunks.push({
+    x: cx, y: cy, w: cw, h: ch,
+    hue: Math.random() * 360,
+    seed: Math.random() * 100,
+    age: 0,
+  });
+
+  /* add a crack ring around the cut */
+  const rect = [
+    { x: cx,         y: cy },
+    { x: cx + cw,    y: cy },
+    { x: cx + cw,    y: cy + ch },
+    { x: cx,         y: cy + ch },
+    { x: cx,         y: cy },
+  ];
+  damage.cracks.push({ pts: rect, w: 2.6 });
+
+  /* fracture lines radiating outward */
+  const corners = [
+    [cx, cy], [cx + cw, cy], [cx + cw, cy + ch], [cx, cy + ch]
+  ];
+  corners.forEach(([px, py]) => {
+    const a = Math.random() * Math.PI * 2;
+    const len = 0.06 + Math.random() * 0.16;
+    const pts = [{ x: px, y: py }];
+    let ccx = px, ccy = py;
+    for (let s = 0; s < 3; s++) {
+      const aa = a + (Math.random() - 0.5) * 1.0;
+      ccx += Math.cos(aa) * len / 3;
+      ccy += Math.sin(aa) * len / 3;
+      pts.push({ x: ccx, y: ccy });
+    }
+    damage.cracks.push({ pts, w: 1.5 + Math.random() * 1.2 });
+  });
+
+  damage.severity = Math.min(1, damage.severity + 0.18 + cw * ch * 1.5);
+  renderGlassCracks();
+  scissorsDraft = null;
+
+  toast('Cut out a chunk — the panel is bleeding rainbow.');
+}
+
 function shatter(uv) {
   const x = uv.x, y = 1 - uv.y;
   const n = 6 + Math.floor(Math.random() * 4);
@@ -834,6 +1023,8 @@ function shatter(uv) {
 function repairScreen() {
   damage.severity = 0;
   damage.cracks.length = 0;
+  damage.chunks.length = 0;
+  scissorsDraft = null;
   renderGlassCracks();
   toast('Screen replaced.');
 }
@@ -920,8 +1111,8 @@ dom.addEventListener('pointerdown', e => {
   setPointer(e.clientX, e.clientY);
   down = { x: e.clientX, y: e.clientY, t: performance.now(), moved: false };
 
-  /* Knife or ALL: start cutting if on screen */
-  if (tool === 'knife' || tool === 'all') {
+  /* Knife → free-form slicing */
+  if (tool === 'knife') {
     const hits = pick();
     const h = hits.find(isScreenHit);
     if (h) {
@@ -929,6 +1120,21 @@ dom.addEventListener('pointerdown', e => {
       controls.enabled = false;
       currentCut = null;
       addCut(h.uv);
+      try { dom.setPointerCapture(e.pointerId); } catch(_) {}
+    }
+    return;
+  }
+
+  /* Scissors or ALL → rectangle chunk cut */
+  if (tool === 'scissors' || tool === 'all') {
+    const hits = pick();
+    const h = hits.find(isScreenHit);
+    if (h) {
+      scissoring = true;
+      controls.enabled = false;
+      const ux = h.uv.x;
+      const uy = 1 - h.uv.y;
+      scissorsDraft = { x1: ux, y1: uy, x2: ux, y2: uy };
       try { dom.setPointerCapture(e.pointerId); } catch(_) {}
     }
   }
@@ -940,10 +1146,20 @@ dom.addEventListener('pointermove', e => {
   if (down && !down.moved && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) {
     down.moved = true;
   }
+
   if (cutting) {
     const hits = pick();
     const h = hits.find(isScreenHit);
     if (h) addCut(h.uv);
+  }
+
+  if (scissoring && scissorsDraft) {
+    const hits = pick();
+    const h = hits.find(isScreenHit);
+    if (h) {
+      scissorsDraft.x2 = Math.max(0, Math.min(1, h.uv.x));
+      scissorsDraft.y2 = Math.max(0, Math.min(1, 1 - h.uv.y));
+    }
   }
 });
 
@@ -953,11 +1169,20 @@ function endPointer() {
     controls.enabled = true;
     if (currentCut) {
       finishCut();
-      toast('You cut through the panel.');
+      toast('Sliced the panel.');
     }
     down = null;
     return;
   }
+
+  if (scissoring) {
+    scissoring = false;
+    controls.enabled = true;
+    if (scissorsDraft) commitScissorsCut();
+    down = null;
+    return;
+  }
+
   if (down && !down.moved && performance.now() - down.t < 500) {
     handleTap();
   }
@@ -966,7 +1191,7 @@ function endPointer() {
 dom.addEventListener('pointerup', endPointer);
 dom.addEventListener('pointercancel', endPointer);
 
-/* ---------- tap router (per tool + ALL fallback) ---------- */
+/* ---------- tap router ---------- */
 function handleTap() {
   const hits = pick();
   if (!hits.length) {
@@ -980,18 +1205,14 @@ function handleTap() {
   const p = hitPart(h);
   if (!p) return;
 
-  /* If a heat-gun is active and target is heatable → heat it and stop */
   if ((tool === 'heat' || tool === 'all') && p.heatable && !p.removed) {
     heatTarget(p);
     return;
   }
 
   switch (tool) {
-    case 'inspect':
-      showInfo(p); break;
-
-    case 'pry':
-      tryPry(p); break;
+    case 'inspect': showInfo(p); break;
+    case 'pry':     tryPry(p); break;
 
     case 'screw':
       if (!tryUnscrew(p)) toast('Point the screwdriver at a screw.');
@@ -1003,76 +1224,77 @@ function handleTap() {
       break;
 
     case 'knife':
-      /* knife click (no drag) = small cut */
       if (p.id === 'display' || p.id === 'frontGlass') {
         addCut(h.uv); finishCut();
         toast('Scored the screen.');
       } else toast('Run the blade across the screen.');
       break;
 
+    case 'scissors':
+      /* single tap = small chunk cut at that spot */
+      if (p.id === 'display' || p.id === 'frontGlass') {
+        const ux = h.uv.x, uy = 1 - h.uv.y;
+        const s = 0.10;
+        scissorsDraft = {
+          x1: Math.max(0, ux - s / 2), y1: Math.max(0, uy - s / 2),
+          x2: Math.min(1, ux + s / 2), y2: Math.min(1, uy + s / 2),
+        };
+        commitScissorsCut();
+      } else toast('Tap or drag on the screen to cut a chunk.');
+      break;
+
     case 'heat':
       if (!p.heatable) toast('Only glued panels can be heated.');
       break;
 
-    /* ---------- ALL: figure out the best action ---------- */
     case 'all': {
-      /* 1. Screws → unscrew */
       if (p.id.startsWith('screw')) { tryUnscrew(p); return; }
 
-      /* 2. Heated panel → pry */
       if (p.id === 'backCover' || p.id === 'frontGlass') {
         if (p.heatLocked) { tryPry(p); return; }
-        /* not heated yet — heat it instead */
         heatTarget(p);
         return;
       }
 
-      /* 3. Screen → cut */
       if (p.id === 'display' || p.id === 'frontGlass') {
-        addCut(h.uv); finishCut();
-        toast('Scored the screen.');
+        const ux = h.uv.x, uy = 1 - h.uv.y;
+        const s = 0.10;
+        scissorsDraft = {
+          x1: Math.max(0, ux - s / 2), y1: Math.max(0, uy - s / 2),
+          x2: Math.min(1, ux + s / 2), y2: Math.min(1, uy + s / 2),
+        };
+        commitScissorsCut();
         return;
       }
 
-      /* 4. Anything else → try to pry, else show info */
       const before = p.removed;
-      const infoBefore = infoEl.classList.contains('show');
       tryPry(p);
-      if (p.removed === before && !infoEl.classList.contains('show')) {
-        /* pry did nothing informative enough — just show info */
-        showInfo(p);
-      } else if (!infoBefore && p.removed === before) {
-        /* pry showed a toast but didn't remove — still fine */
-      }
+      if (p.removed === before && !infoEl.classList.contains('show')) showInfo(p);
       break;
     }
   }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   12. HEATING (persistent / locked-in)
+   12. HEATING (persistent)
    ═══════════════════════════════════════════════════════════ */
 function heatTarget(p) {
   if (p.heatLocked) {
     toast(`${p.name} is already fully heated.`);
     return;
   }
-  /* insta-boost to full — no waiting around */
   p.heat = 1;
   p.heatLocked = true;
   p._notified = true;
-  const g = 1;
   for (const m of p.glow) {
-    if (m.emissive) m.emissive.setRGB(g * 0.9, g * 0.30, g * 0.05);
+    if (m.emissive) m.emissive.setRGB(0.9, 0.30, 0.05);
   }
   toast(`${p.name} heated — glue softened. Pry it off.`);
   if (selectedPart === p) updateHeatBar();
 }
 
 function updateHeat(dt) {
-  /* heat just keeps the glow visual; nothing cools down */
   if (tool === 'heat' || tool === 'all') {
-    /* hover heat (drag over a heatable panel keeps boosting) */
     raycaster.setFromCamera(pointer, camera);
     const hits = raycaster.intersectObjects(pickables, false);
     let hovered = null;
@@ -1081,7 +1303,6 @@ function updateHeat(dt) {
       if (p && p.heatable && !p.removed) hovered = p;
     }
     hoverHeatPart = hovered;
-    /* if hovering a heatable target, boost heat each frame — locks in at 100% */
     if (hoverHeatPart) {
       const p = hoverHeatPart;
       if (p.heat < 1) {
@@ -1100,7 +1321,6 @@ function updateHeat(dt) {
     hoverHeatPart = null;
   }
 
-  /* small pulsing glow on locked parts so it's obvious they're hot */
   const pulse = 0.82 + 0.12 * Math.sin(performance.now() * 0.003);
   for (const p of parts) {
     if (!p.heatable) continue;
@@ -1117,6 +1337,8 @@ function updateHeat(dt) {
 /* ═══════════════════════════════════════════════════════════
    13. FRAME UPDATES
    ═══════════════════════════════════════════════════════════ */
+let autoDir = 0;
+
 function updateExplode(dt) {
   if (autoDir !== 0) {
     explodeTarget = THREE.MathUtils.clamp(explodeTarget + autoDir * dt * 0.5, 0, 1);
@@ -1125,8 +1347,6 @@ function updateExplode(dt) {
   }
   explodeCur += (explodeTarget - explodeCur) * (1 - Math.pow(0.002, dt));
 }
-
-let autoDir = 0;
 
 function updateParts(dt) {
   const k = 1 - Math.pow(0.001, dt);
@@ -1185,6 +1405,9 @@ function animate() {
   updateHeat(dt);
   updateParts(dt);
 
+  /* age chunks (used for seed drift) */
+  for (const c of damage.chunks) c.age += dt;
+
   screenAccum += dt;
   if (screenAccum >= screenInterval) {
     screenAccum = 0;
@@ -1215,13 +1438,14 @@ toolButtons.forEach(btn => {
     tool = btn.dataset.tool;
 
     const hints = {
-      all:     'Tap screws to loosen · tap glued panels to heat · drag on screen to cut · tap lifted parts to remove.',
-      inspect: 'Tap a part to learn what it does.',
-      heat:    'Tap or drag over a glued panel to heat it — the heat locks in.',
-      pry:     'Tap a heated panel to lift it off.',
-      screw:   'Tap each screw to unscrew it.',
-      knife:   'Drag across the screen to slice it.',
-      hammer:  'Tap the screen to smash it.',
+      all:      'Drag on the screen to cut a chunk · tap screws, glued panels, or parts to act.',
+      inspect:  'Tap a part to learn what it does.',
+      heat:     'Tap or drag over a glued panel — heat locks in.',
+      pry:      'Tap a heated panel to lift it off.',
+      screw:    'Tap each screw to unscrew it.',
+      knife:    'Drag across the screen to slice it.',
+      scissors: 'Drag a rectangle on the screen — release to cut that chunk out.',
+      hammer:   'Tap the screen to smash it.',
     };
     toast(hints[tool]);
   });
@@ -1248,7 +1472,7 @@ document.getElementById('videoFile').addEventListener('change', e => {
   videoEl.muted = true;
   videoEl.playsInline = true;
   videoEl.play().catch(() => {});
-  toast('Video loaded. Now try breaking the screen.');
+  toast('Video loaded. Now try cutting a chunk out.');
 });
 
 /* ═══════════════════════════════════════════════════════════
@@ -1272,7 +1496,7 @@ renderGlassCracks();
 showInfo(partById.display);
 animate();
 
-setTimeout(() => toast('ALL mode is on — tap screws, tap glued panels to heat them instantly, drag the screen to cut it.'), 1200);
+setTimeout(() => toast('Drag on the screen to cut a chunk out — the panel will bleed rainbow.'), 1200);
 </script>
 </body>
 </html>
