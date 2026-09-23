@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PhoneLab — Interactive 3D Teardown</title>
+<style>
+  :root{
+    --bg:#070a11;
+    --panel:rgba(15,21,33,0.82);
+    --line:rgba(120,160,255,0.18);
+    --txt:#dbe6f7;
+    --dim:#8291aa;
+    --acc:#4da3ff;
+    --warn:#ff9a4d;
+    --bad:#ff5a6e;
+    --ok:#3ddc9a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    color:var(--txt);-webkit-font-smoothing:antialiased;}
+  canvas{display:block;}
+
+  #ui{position:fixed;inset:0;pointer-events:none;z-index:10;}
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    box-shadow:0 12px 40px rgba(0,0,0,.55);
+    pointer-events:auto;
+  }
+
+  /* ---------- header ---------- */
+  #header{position:absolute;top:18px;left:20px;}
+  #header h1{
+    margin:0;font-size:19px;letter-spacing:.18em;font-weight:800;
+  }
+  #header h1 span{color:var(--acc);}
+  #header p{margin:3px 0 0;font-size:11.5px;color:var(--dim);letter-spacing:.04em;}
+
+  /* ---------- tools ---------- */
+  #tools{
+    position:absolute;left:20px;top:50%;transform:translateY(-50%);
+    display:flex;flex-direction:column;gap:6px;padding:8px;width:132px;
+  }
+  #tools button{
+    all:unset;cursor:pointer;display:flex;align-items:center;gap:9px;
+    padding:9px 10px;border-radius:10px;font-size:12.5px;font-weight:600;
+    color:var(--dim);transition:.15s;border:1px solid transparent;
+  }
+  #tools button span{font-size:15px;width:18px;text-align:center;filter:grayscale(1) opacity(.7);}
+  #tools button:hover{background:rgba(77,163,255,.10);color:var(--txt);}
+  #tools button.active{
+    background:rgba(77,163,255,.16);color:#fff;border-color:rgba(77,163,255,.45);
+    box-shadow:0 0 18px rgba(77,163,255,.18) inset;
+  }
+  #tools button.active span{filter:none;}
+
+  /* ---------- info ---------- */
+  #info{
+    position:absolute;right:20px;top:18px;width:290px;padding:16px 16px 14px;
+    opacity:0;transform:translateY(-8px);transition:.25s;pointer-events:none;
+  }
+  #info.show{opacity:1;transform:none;pointer-events:auto;}
+  #info h2{margin:0 0 8px;font-size:14px;letter-spacing:.04em;color:#fff;}
+  #info h2::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:var(--acc);margin-right:8px;vertical-align:middle;box-shadow:0 0 10px var(--acc);}
+  #info p{margin:0;font-size:12.3px;line-height:1.6;color:#a9b8d0;}
+  #info .heatwrap{margin-top:12px;display:none;}
+  #info .heatwrap.on{display:block;}
+  #info .heatbar{height:5px;border-radius:3px;background:rgba(255,255,255,.09);overflow:hidden;}
+  #info .heatfill{height:100%;width:0%;border-radius:3px;
+    background:linear-gradient(90deg,#ff9a4d,#ff4d4d);transition:width .1s linear;}
+  #info small{display:block;margin-top:6px;font-size:10.5px;color:var(--dim);letter-spacing:.05em;}
+
+  /* ---------- bottom ---------- */
+  #bottom{
+    position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+    display:flex;align-items:center;gap:14px;padding:11px 16px;white-space:nowrap;
+  }
+  #bottom label{font-size:11.5px;color:var(--dim);letter-spacing:.08em;display:flex;align-items:center;gap:10px;}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:170px;height:4px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc),rgba(255,255,255,.14));outline:none;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:#fff;
+    box-shadow:0 0 10px rgba(77,163,255,.9);cursor:grab;
+  }
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border:none;border-radius:50%;
+    background:#fff;box-shadow:0 0 10px rgba(77,163,255,.9);cursor:grab;}
+  .btn{
+    all:unset;cursor:pointer;font-size:11.5px;font-weight:600;letter-spacing:.05em;
+    padding:7px 13px;border-radius:9px;color:var(--txt);
+    background:rgba(255,255,255,.06);border:1px solid var(--line);transition:.15s;
+  }
+  .btn:hover{background:rgba(77,163,255,.18);border-color:rgba(77,163,255,.5);}
+  .btn.file{position:relative;overflow:hidden;}
+  .btn.file input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0;}
+
+  /* ---------- toast ---------- */
+  #toast{
+    position:absolute;left:50%;bottom:96px;transform:translate(-50%,10px);
+    background:rgba(12,18,30,.95);border:1px solid var(--line);
+    padding:10px 18px;border-radius:11px;font-size:12.5px;color:#dbe6f7;
+    opacity:0;transition:.28s;pointer-events:none;max-width:80vw;text-align:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.6);
+  }
+  #toast.show{opacity:1;transform:translate(-50%,0);}
+
+  /* ---------- labels ---------- */
+  #labels{position:absolute;inset:0;pointer-events:none;}
+  .label{
+    position:absolute;left:0;top:0;font-size:10px;font-weight:700;letter-spacing:.09em;
+    color:#bfe0ff;text-transform:uppercase;white-space:nowrap;opacity:0;transition:opacity .3s;
+    text-shadow:0 0 8px #000,0 0 3px #000,0 0 12px rgba(77,163,255,.8);
+    padding:2px 7px;border-radius:20px;background:rgba(10,20,40,.5);
+    border:1px solid rgba(120,180,255,.25);
+  }
+
+  @media (max-width:900px){
+    #tools{width:auto;flex-direction:row;flex-wrap:wrap;left:50%;top:auto;bottom:96px;
+      transform:translateX(-50%);justify-content:center;max-width:94vw;}
+    #tools button{padding:8px;font-size:0;gap:0;}
+    #tools button span{font-size:17px;}
+    #info{right:12px;left:12px;top:auto;bottom:158px;width:auto;}
+    #bottom{flex-wrap:wrap;justify-content:center;gap:9px;bottom:12px;max-width:96vw;}
+    input[type=range]{width:110px;}
+    #header{left:14px;top:12px;}
+    #header h1{font-size:15px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <div id="header">
+    <h1>PHONE<span>LAB</span></h1>
+    <p>Interactive teardown &amp; damage simulator</p>
+  </div>
+
+  <div id="tools" class="panel">
+    <button data-tool="inspect" class="active"><span>🔍</span>Inspect</button>
+    <button data-tool="heat"><span>🔥</span>Heat Gun</button>
+    <button data-tool="pry"><span>🪛</span>Pry Tool</button>
+    <button data-tool="screw"><span>🔧</span>Screwdriver</button>
+    <button data-tool="knife"><span>🔪</span>Knife</button>
+    <button data-tool="hammer"><span>🔨</span>Hammer</button>
+  </div>
+
+  <aside id="info" class="panel">
+    <h2 id="infoTitle">Select a part</h2>
+    <p id="infoText">Click any component with the Inspect tool to learn what it does.</p>
+    <div class="heatwrap" id="heatWrap">
+      <div class="heatbar"><div class="heatfill" id="heatFill"></div></div>
+      <small id="heatLabel">ADHESIVE 0% SOFTENED</small>
+    </div>
+  </aside>
+
+  <div id="bottom" class="panel">
+    <label>EXPLODE <input type="range" id="explode" min="0" max="100" value="0"></label>
+    <button class="btn" id="autoBtn">AUTO</button>
+    <button class="btn" id="repairBtn">REPAIR</button>
+    <label class="btn file">LOAD VIDEO<input type="file" id="videoFile" accept="video/*"></label>
+  </div>
+
+  <div id="toast"></div>
+  <div id="labels"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ══════════════════════════════════════════════════════════════
+   1. RENDERER · SCENE · CAMERA
+   ══════════════════════════════════════════════════════════════ */
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x070a11);
+scene.fog = new THREE.Fog(0x070a11, 20, 46);
+
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(0, 0.9, 13);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.minDistance = 6;
+controls.maxDistance = 28;
+controls.target.set(0, 0, 0);
+
+/* environment for nice metal reflections */
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+/* ══════════════════════════════════════════════════════════════
+   2. LIGHTS · FLOOR
+   ══════════════════════════════════════════════════════════════ */
+scene.add(new THREE.HemisphereLight(0x9fc0ff, 0x0c1018, 0.55));
+
+const key = new THREE.DirectionalLight(0xffffff, 2.4);
+key.position.set(7, 11, 9);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.near = 1;
+key.shadow.camera.far = 44;
+key.shadow.camera.left = -9;
+key.shadow.camera.right = 9;
+key.shadow.camera.top = 9;
+key.shadow.camera.bottom = -9;
+key.shadow.bias = -0.0006;
+key.shadow.radius = 3;
+scene.add(key);
+
+const rim = new THREE.DirectionalLight(0x4d8dff, 2.0);
+rim.position.set(-9, 3, -7);
+scene.add(rim);
+
+const fill = new THREE.PointLight(0xff8a4d, 22, 32);
+fill.position.set(4, -5, 6);
+scene.add(fill);
+
+const floor = new THREE.Mesh(
+  new THREE.CircleGeometry(26, 64),
+  new THREE.MeshStandardMaterial({ color: 0x0a0e16, roughness: 0.88, metalness: 0.25 })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -3.62;
+floor.receiveShadow = true;
+scene.add(floor);
+
+const grid = new THREE.GridHelper(52, 52, 0x1b2740, 0x111a29);
+grid.position.y = -3.6;
+grid.material.transparent = true;
+grid.material.opacity = 0.5;
+scene.add(grid);
+
+/* ══════════════════════════════════════════════════════════════
+   3. SCREEN CANVAS  (the "video" that plays on the display)
+   ══════════════════════════════════════════════════════════════ */
+const SCW = 640, SCH = 1280;
+const screenCanvas = document.createElement('canvas');
+screenCanvas.width = SCW;
+screenCanvas.height = SCH;
+const sctx = screenCanvas.getContext('2d');
+
+const screenTex = new THREE.CanvasTexture(screenCanvas);
+screenTex.colorSpace = THREE.SRGBColorSpace;
+screenTex.generateMipmaps = false;
+screenTex.minFilter = THREE.LinearFilter;
+screenTex.magFilter = THREE.LinearFilter;
+
+/* user-loaded video (optional) */
+let videoEl = null;
+
+/* --- procedural "video" frame --- */
+function drawProcedural(ctx, W, H, t) {
+  const hue = (t * 11) % 360;
+
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, `hsl(${hue}, 62%, 36%)`);
+  g.addColorStop(0.5, `hsl(${(hue + 58) % 360}, 68%, 24%)`);
+  g.addColorStop(1, `hsl(${(hue + 155) % 360}, 72%, 14%)`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  /* soft moving light blobs */
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 6; i++) {
+    const x = W * (0.5 + 0.44 * Math.sin(t * 0.55 + i * 1.9));
+    const y = H * (0.5 + 0.44 * Math.cos(t * 0.41 + i * 2.7));
+    const r = W * (0.34 + 0.12 * Math.sin(t * 0.7 + i));
+    const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
+    rg.addColorStop(0, `hsla(${(hue + i * 62) % 360}, 95%, 62%, 0.34)`);
+    rg.addColorStop(1, 'hsla(0,0%,0%,0)');
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
+  /* scrolling scan grid — gives a sense of motion */
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  const off = (t * 90) % 64;
+  for (let y = -64 + off; y < H; y += 64) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+
+  /* a bouncing "subject" */
+  const bx = W * (0.5 + 0.3 * Math.sin(t * 0.9));
+  const by = H * (0.62 + 0.06 * Math.sin(t * 1.8));
+  ctx.beginPath();
+  ctx.arc(bx, by, W * 0.11, 0, Math.PI * 2);
+  ctx.fillStyle = `hsla(${(hue + 200) % 360}, 100%, 72%, 0.9)`;
+  ctx.shadowColor = `hsla(${(hue + 200) % 360}, 100%, 70%, 0.9)`;
+  ctx.shadowBlur = 40;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  /* title */
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.96)';
+  ctx.font = `800 ${Math.round(W * 0.088)}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.fillText('SPECTRA OS', W / 2, H * 0.30);
+  ctx.font = `600 ${Math.round(W * 0.040)}px ui-monospace, monospace`;
+  ctx.fillStyle = 'rgba(255,255,255,0.68)';
+  ctx.fillText('LIVE  •  4K  •  HDR', W / 2, H * 0.345);
+
+  /* timecode */
+  ctx.textAlign = 'left';
+  ctx.font = `600 ${Math.round(W * 0.036)}px ui-monospace, monospace`;
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.fillText(new Date().toLocaleTimeString(), W * 0.06, H * 0.045);
+
+  /* rec dot */
+  if (Math.sin(t * 3) > 0) {
+    ctx.beginPath();
+    ctx.arc(W * 0.9, H * 0.037, W * 0.013, 0, Math.PI * 2);
+    ctx.fillStyle = '#ff4d5e';
+    ctx.fill();
+  }
+
+  /* progress bar */
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fillRect(W * 0.06, H * 0.955, W * 0.88, 5);
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.fillRect(W * 0.06, H * 0.955, W * 0.88 * ((t * 0.07) % 1), 5);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   4. DAMAGE MODEL
+   ══════════════════════════════════════════════════════════════ */
+const damage = {
+  severity: 0,       // 0 → 1.3  (1 = dead panel)
+  cracks: [],        // { pts:[{x,y}] normalised 0..1 (y down), w }
+  dead: [],          // { x,y,r (normalised), seed, grow }
+};
+
+/* glass crack overlay canvas */
+const GCW = 512, GCH = 1024;
+const glassCanvas = document.createElement('canvas');
+glassCanvas.width = GCW;
+glassCanvas.height = GCH;
+const gctx = glassCanvas.getContext('2d');
+const glassTex = new THREE.CanvasTexture(glassCanvas);
+glassTex.colorSpace = THREE.SRGBColorSpace;
+
+function renderGlassCracks() {
+  gctx.clearRect(0, 0, GCW, GCH);
+  gctx.lineCap = 'round';
+  gctx.lineJoin = 'round';
+  for (const cr of damage.cracks) {
+    if (cr.pts.length < 2) continue;
+    gctx.beginPath();
+    cr.pts.forEach((p, i) => i ? gctx.lineTo(p.x * GCW, p.y * GCH) : gctx.moveTo(p.x * GCW, p.y * GCH));
+    gctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    gctx.lineWidth = cr.w * 3.4;
+    gctx.stroke();
+    gctx.strokeStyle = 'rgba(200,232,255,0.95)';
+    gctx.lineWidth = Math.max(1, cr.w);
+    gctx.stroke();
+  }
+  glassTex.needsUpdate = true;
+}
+
+/* --- draw the whole screen each frame --- */
+function renderScreen(dt, time) {
+  const ctx = sctx, W = SCW, H = SCH;
+
+  /* 1 ── video / procedural feed */
+  if (videoEl && videoEl.readyState >= 2 && videoEl.videoWidth) {
+    const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+    const s = Math.max(W / vw, H / vh);
+    const dw = vw * s, dh = vh * s;
+    ctx.drawImage(videoEl, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  } else {
+    drawProcedural(ctx, W, H, time);
+  }
+
+  /* 2 ── dead pixel regions */
+  for (const d of damage.dead) {
+    const cx = d.x * W, cy = d.y * H, cr = d.r * W;
+    ctx.save();
+    ctx.beginPath();
+    const N = 22;
+    for (let i = 0; i <= N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      const rr = cr * (0.72 + 0.30 * Math.sin(a * 3 + d.seed) + 0.13 * Math.sin(a * 7 + d.seed * 2));
+      const x = cx + Math.cos(a) * rr;
+      const y = cy + Math.sin(a) * rr;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(4,5,9,0.97)';
+    ctx.fill();
+    ctx.strokeStyle = `rgba(150,255,225,${0.12 + 0.25 * Math.random() * damage.severity})`;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* 3 ── cracks */
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const cr of damage.cracks) {
+    if (cr.pts.length < 2) continue;
+    ctx.beginPath();
+    cr.pts.forEach((p, i) => i ? ctx.lineTo(p.x * W, p.y * H) : ctx.moveTo(p.x * W, p.y * H));
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineWidth = cr.w + 4;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(235,246,255,0.92)';
+    ctx.lineWidth = cr.w;
+    ctx.stroke();
+  }
+
+  /* 4 ── glitch bands */
+  if (damage.severity > 0.28) {
+    const bands = Math.min(12, Math.floor(damage.severity * 10));
+    for (let i = 0; i < bands; i++) {
+      if (Math.random() > 0.55) continue;
+      const y = Math.random() * H;
+      const h = 6 + Math.random() * 46;
+      const dx = (Math.random() - 0.5) * 130 * damage.severity;
+      ctx.drawImage(screenCanvas, 0, y, W, h, dx, y, W, h);
+    }
+  }
+
+  /* 5 ── panel failure */
+  if (damage.severity >= 1) {
+    const f = 0.55 + 0.32 * Math.sin(time * 26) + 0.12 * Math.random();
+    ctx.fillStyle = `rgba(0,0,0,${Math.min(0.96, Math.max(0, f))})`;
+    ctx.fillRect(0, 0, W, H);
+  } else if (damage.severity > 0.55) {
+    ctx.fillStyle = `rgba(0,0,0,${(damage.severity - 0.55) * 0.55})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  screenTex.needsUpdate = true;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   5. BUILD THE PHONE
+   ══════════════════════════════════════════════════════════════ */
+const PW = 3.2, PH = 6.4;
+const phone = new THREE.Group();
+scene.add(phone);
+
+const parts = [];
+const partById = {};
+
+function registerPart(o) {
+  const p = {
+    id: o.id, name: o.name, object: o.object,
+    base: o.base.clone(), explode: o.explode.clone(),
+    info: o.info, heatable: !!o.heatable, label: o.label !== false,
+    heat: 0, removed: false, glow: o.glow || [],
+    detach: new THREE.Vector3(), detachTarget: new THREE.Vector3(),
+    rot: new THREE.Vector3(), rotTarget: new THREE.Vector3(),
+    spin: 0,
+  };
+  o.object.position.copy(p.base);
+  o.object.traverse(c => { c.userData.partId = o.id; });
+  phone.add(o.object);
+  parts.push(p);
+  partById[o.id] = p;
+  return p;
+}
+
+/* ---------- shared materials ---------- */
+const matMetal  = new THREE.MeshStandardMaterial({ color: 0x9aa3b2, metalness: 0.96, roughness: 0.28 });
+const matDark   = new THREE.MeshStandardMaterial({ color: 0x151922, metalness: 0.55, roughness: 0.6 });
+const matPCB    = new THREE.MeshStandardMaterial({ color: 0x0d4a33, metalness: 0.25, roughness: 0.82 });
+const matChip   = new THREE.MeshStandardMaterial({ color: 0x2a2f3a, metalness: 0.7, roughness: 0.35 });
+const matSilver = new THREE.MeshStandardMaterial({ color: 0xc9d3e0, metalness: 1.0, roughness: 0.18 });
+const matBatt   = new THREE.MeshStandardMaterial({ color: 0x39414f, metalness: 0.6, roughness: 0.45 });
+const matCopper = new THREE.MeshStandardMaterial({ color: 0xb87333, metalness: 0.95, roughness: 0.3 });
+
+/* ---------- 5.1 MID-FRAME ---------- */
+const frameGroup = new THREE.Group();
+const FT = 0.18, FD = 0.24;
+function frameBar(w, h, x, y) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, FD), matMetal);
+  m.position.set(x, y, 0);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  frameGroup.add(m);
+}
+frameBar(FT, PH, -PW / 2 + FT / 2, 0);
+frameBar(FT, PH,  PW / 2 - FT / 2, 0);
+frameBar(PW - FT * 2, FT, 0,  PH / 2 - FT / 2);
+frameBar(PW - FT * 2, FT, 0, -PH / 2 + FT / 2);
+
+const plate = new THREE.Mesh(
+  new THREE.BoxGeometry(PW - FT * 2, PH - FT * 2, 0.05),
+  new THREE.MeshStandardMaterial({ color: 0x272c36, metalness: 0.85, roughness: 0.45 })
+);
+plate.position.z = -0.085;
+plate.receiveShadow = true;
+frameGroup.add(plate);
+
+registerPart({
+  id: 'frame', name: 'Mid-frame', object: frameGroup,
+  base: new THREE.Vector3(0, 0, 0),
+  explode: new THREE.Vector3(0, 0, 0),
+  info: 'Aluminium chassis. It is the skeleton that everything bolts onto, it spreads heat away from the chip, and in most phones it doubles as the main antenna.'
+});
+
+/* ---------- 5.2 SCREWS ---------- */
+const screwPositions = [
+  [-1.33, 2.72], [1.33, 2.72],
+  [-1.33, 0],    [1.33, 0],
+  [-1.33, -2.72], [1.33, -2.72],
+];
+screwPositions.forEach(([x, y], i) => {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.05, 18), matSilver);
+  body.rotation.x = Math.PI / 2;
+  body.castShadow = true;
+  g.add(body);
+
+  const slotA = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.018, 0.02), matDark);
+  slotA.position.z = -0.027;
+  g.add(slotA);
+  const slotB = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.11, 0.02), matDark);
+  slotB.position.z = -0.027;
+  g.add(slotB);
+
+  registerPart({
+    id: 'screw' + i, name: 'Screw', object: g,
+    base: new THREE.Vector3(x, y, -0.142),
+    explode: new THREE.Vector3(x * 0.28, y * 0.18, -1.4),
+    label: false,
+    info: 'A pentalobe / Phillips screw. Modern phones use only a handful of them — adhesive does most of the holding.'
+  });
+});
+
+/* ---------- 5.3 BATTERY ---------- */
+const battGroup = new THREE.Group();
+const battBody = new THREE.Mesh(new THREE.BoxGeometry(1.95, 3.1, 0.16), matBatt);
+battBody.castShadow = true;
+battBody.receiveShadow = true;
+battGroup.add(battBody);
+
+const coil = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.028, 10, 48), matCopper);
+coil.position.z = -0.11;
+battGroup.add(coil);
+
+/* little pouch ridge */
+const ridge = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.04, 0.01),
+  new THREE.MeshStandardMaterial({ color: 0x2a303b, metalness: 0.6, roughness: 0.5 }));
+ridge.position.set(0, 1.35, 0.085);
+battGroup.add(ridge);
+
+registerPart({
+  id: 'battery', name: 'Battery', object: battGroup,
+  base: new THREE.Vector3(0, -1.15, -0.02),
+  explode: new THREE.Vector3(0, -1.0, -1.1),
+  info: 'Lithium-polymer cell (~4500 mAh). Lithium ions shuttle between the anode and cathode; a fuel-gauge chip and protection circuit keep it from over-charging or venting.'
+});
+
+/* ---------- 5.4 MOTHERBOARD ---------- */
+const mbGroup = new THREE.Group();
+const pcb = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.9, 0.06), matPCB);
+pcb.castShadow = true;
+pcb.receiveShadow = true;
+mbGroup.add(pcb);
+
+/* chips */
+const chipData = [
+  [0.0, 0.28, 0.52, 0.52],
+  [-0.52, 0.55, 0.28, 0.28],
+  [0.52, 0.55, 0.26, 0.26],
+  [-0.55, -0.42, 0.34, 0.26],
+  [0.48, -0.5, 0.3, 0.3],
+];
+chipData.forEach(([x, y, w, h]) => {
+  const chip = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.07), matChip);
+  chip.position.set(x, y, 0.065);
+  chip.castShadow = true;
+  mbGroup.add(chip);
+  const die = new THREE.Mesh(new THREE.BoxGeometry(w * 0.55, h * 0.55, 0.012), matSilver);
+  die.position.set(x, y, 0.106);
+  mbGroup.add(die);
+});
+
+/* tiny passives */
+for (let i = 0; i < 26; i++) {
+  const t = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.02),
+    new THREE.MeshStandardMaterial({ color: 0x7a6a4a, metalness: 0.6, roughness: 0.5 }));
+  t.position.set((Math.random() - 0.5) * 1.7, (Math.random() - 0.5) * 1.7, 0.045);
+  mbGroup.add(t);
+}
+
+registerPart({
+  id: 'motherboard', name: 'Motherboard', object: mbGroup,
+  base: new THREE.Vector3(0.35, 2.05, -0.03),
+  explode: new THREE.Vector3(0.5, 1.2, -1.7),
+  info: 'The brain. The SoC (CPU + GPU + NPU), RAM, flash storage, power-management ICs and the 5G / Wi-Fi / Bluetooth radios all live on this board.'
+});
+
+/* ---------- 5.5 CAMERA MODULE ---------- */
+const camGroup = new THREE.Group();
+const camBase = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.86, 0.06), matDark);
+camBase.castShadow = true;
+camGroup.add(camBase);
+
+const lensOffsets = [[-0.2, 0.2], [0.2, 0.2], [0, -0.22]];
+lensOffsets.forEach(([x, y]) => {
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.14, 22), matSilver);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.set(x, y, -0.1);
+  barrel.castShadow = true;
+  camGroup.add(barrel);
+
+  const glass = new THREE.Mesh(new THREE.CircleGeometry(0.13, 22),
+    new THREE.MeshPhysicalMaterial({ color: 0x0a1420, metalness: 0.4, roughness: 0.05, clearcoat: 1 }));
+  glass.position.set(x, y, -0.172);
+  glass.rotation.y = Math.PI;
+  camGroup.add(glass);
+});
+
+registerPart({
+  id: 'camera', name: 'Camera module', object: camGroup,
+  base: new THREE.Vector3(-0.95, 2.45, 0.0),
+  explode: new THREE.Vector3(-1.4, 1.5, -2.3),
+  info: 'Lens stack + image sensor + OIS actuator. Photons hit silicon photodiodes and are converted into electrical charge — millions of tiny light meters per frame.'
+});
+
+/* ---------- 5.6 SPEAKER ---------- */
+const spkGroup = new THREE.Group();
+const spkBody = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.28, 0.14), matDark);
+spkBody.castShadow = true;
+spkGroup.add(spkBody);
+const spkMembrane = new THREE.Mesh(new THREE.BoxGeometry(1.34, 0.17, 0.02),
+  new THREE.MeshStandardMaterial({ color: 0x3a4150, metalness: 0.4, roughness: 0.8 }));
+spkMembrane.position.z = 0.075;
+spkGroup.add(spkMembrane);
+
+registerPart({
+  id: 'speaker', name: 'Speaker', object: spkGroup,
+  base: new THREE.Vector3(0, -2.87, -0.02),
+  explode: new THREE.Vector3(0, -1.5, -1.5),
+  info: 'A coil sits in a magnetic field; when current flows the coil pushes a diaphragm, which pushes air. That pressure wave is what your ear reads as sound.'
+});
+
+/* ---------- 5.7 HAPTIC MOTOR ---------- */
+const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.12, 24), matSilver);
+motor.rotation.x = Math.PI / 2;
+motor.castShadow = true;
+registerPart({
+  id: 'motor', name: 'Haptic motor', object: motor,
+  base: new THREE.Vector3(1.06, -2.86, -0.02),
+  explode: new THREE.Vector3(1.4, -1.7, -1.7),
+  info: 'Linear resonant actuator. A small mass is driven back and forth at resonance to create the crisp "tap" you feel when you press the screen.'
+});
+
+/* ---------- 5.8 DISPLAY PANEL ---------- */
+const dispGeo = new THREE.BoxGeometry(PW - 0.2, PH - 0.2, 0.06);
+const screenMat = new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false });
+const display = new THREE.Mesh(dispGeo, [
+  matDark, matDark, matDark, matDark, screenMat, matDark
+]);
+display.castShadow = true;
+display.receiveShadow = true;
+
+registerPart({
+  id: 'display', name: 'Display panel', object: display,
+  base: new THREE.Vector3(0, 0, 0.17),
+  explode: new THREE.Vector3(0, 0, 1.15),
+  info: 'OLED panel. Every pixel is its own light source, so black pixels simply switch off — that is why OLED blacks are perfect and why the panel is so thin.'
+});
+
+/* ---------- 5.9 FRONT GLASS ---------- */
+const matGlass = new THREE.MeshPhysicalMaterial({
+  color: 0xa9c9ff, metalness: 0, roughness: 0.035,
+  transparent: true, opacity: 0.15,
+  clearcoat: 1, clearcoatRoughness: 0.03,
+  side: THREE.DoubleSide, depthWrite: false
+});
+
+const glassGroup = new THREE.Group();
+const glassPane = new THREE.Mesh(new THREE.BoxGeometry(PW, PH, 0.05), matGlass);
+glassGroup.add(glassPane);
+
+const crackOverlay = new THREE.Mesh(
+  new THREE.PlaneGeometry(PW, PH),
+  new THREE.MeshBasicMaterial({ map: glassTex, transparent: true, depthWrite: false, toneMapped: false })
+);
+crackOverlay.position.z = 0.027;
+crackOverlay.userData.pickable = false;
+glassGroup.add(crackOverlay);
+
+registerPart({
+  id: 'frontGlass', name: 'Front glass', object: glassGroup,
+  base: new THREE.Vector3(0, 0, 0.245),
+  explode: new THREE.Vector3(0, 0, 2.1),
+  heatable: true,
+  glow: [matGlass],
+  info: 'Chemically hardened glass. It carries the touch layer and protects the panel. It is glued down with a pressure-sensitive adhesive — heat is what lets you lift it.'
+});
+
+/* ---------- 5.10 BACK COVER ---------- */
+const matBack = new THREE.MeshPhysicalMaterial({
+  color: 0x161b26, metalness: 0.55, roughness: 0.26,
+  clearcoat: 1, clearcoatRoughness: 0.12
+});
+
+const backGroup = new THREE.Group();
+const backPane = new THREE.Mesh(new THREE.BoxGeometry(PW, PH, 0.05), matBack);
+backPane.castShadow = true;
+backPane.receiveShadow = true;
+backGroup.add(backPane);
+
+/* camera bump */
+const bump = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, 0.1),
+  new THREE.MeshStandardMaterial({ color: 0x101420, metalness: 0.8, roughness: 0.3 }));
+bump.position.set(-0.95, 2.45, -0.075);
+bump.castShadow = true;
+backGroup.add(bump);
+
+lensOffsets.forEach(([x, y]) => {
+  const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.05, 24), matSilver);
+  lens.rotation.x = Math.PI / 2;
+  lens.position.set(-0.95 + x, 2.45 + y, -0.14);
+  backGroup.add(lens);
+});
+
+/* brand ring */
+const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.012, 8, 40), matMetal);
+ring.position.set(0, -0.4, -0.03);
+backGroup.add(ring);
+
+registerPart({
+  id: 'backCover', name: 'Back cover', object: backGroup,
+  base: new THREE.Vector3(0, 0, -0.19),
+  explode: new THREE.Vector3(0, 0, -2.1),
+  heatable: true,
+  glow: [matBack],
+  info: 'Glass (or polymer) back. It is bonded to the frame with adhesive to keep dust and water out — which is exactly why a heat mat comes first in every teardown.'
+});
+
+/* ---------- pickable mesh cache ---------- */
+const pickables = [];
+phone.traverse(o => {
+  if (o.isMesh && o.userData.pickable !== false) pickables.push(o);
+});
+
+/* ---------- labels ---------- */
+const labelWrap = document.getElementById('labels');
+parts.forEach(p => {
+  if (!p.label) return;
+  const d = document.createElement('div');
+  d.className = 'label';
+  d.textContent = p.name;
+  labelWrap.appendChild(d);
+  p.el = d;
+});
+
+/* ══════════════════════════════════════════════════════════════
+   6. INTERACTION STATE
+   ══════════════════════════════════════════════════════════════ */
+let tool = 'inspect';
+let explodeTarget = 0;
+let explodeCur = 0;
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2(0, 0);
+let pointerInside = false;
+
+let down = null;
+let cutting = false;
+let currentCut = null;
+let hoverHeatPart = null;
+let selectedPart = null;
+
+function setPointer(e) {
+  pointer.x = (e.clientX / innerWidth) * 2 - 1;
+  pointer.y = -(e.clientY / innerHeight) * 2 + 1;
+  pointerInside = true;
+}
+
+function pick() {
+  raycaster.setFromCamera(pointer, camera);
+  return raycaster.intersectObjects(pickables, false);
+}
+
+function hitPart(hit) {
+  let o = hit.object;
+  while (o && !o.userData.partId) o = o.parent;
+  return o ? partById[o.userData.partId] : null;
+}
+
+function isScreenHit(h) {
+  const p = hitPart(h);
+  return p && (p.id === 'display' || p.id === 'frontGlass');
+}
+
+/* ---------- toast ---------- */
+let toastTimer;
+const toastEl = document.getElementById('toast');
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2800);
+}
+
+/* ---------- info panel ---------- */
+const infoEl = document.getElementById('info');
+const infoTitle = document.getElementById('infoTitle');
+const infoText = document.getElementById('infoText');
+const heatWrap = document.getElementById('heatWrap');
+const heatFill = document.getElementById('heatFill');
+const heatLabel = document.getElementById('heatLabel');
+
+function showInfo(p) {
+  selectedPart = p;
+  infoTitle.textContent = p.name;
+  infoText.textContent = p.info;
+  heatWrap.classList.toggle('on', p.heatable);
+  infoEl.classList.add('show');
+  updateHeatBar();
+}
+function updateHeatBar() {
+  if (!selectedPart || !selectedPart.heatable) return;
+  const v = Math.round(selectedPart.heat * 100);
+  heatFill.style.width = v + '%';
+  heatLabel.textContent = v >= 100
+    ? 'ADHESIVE SOFTENED ✓ — PRY IT OFF'
+    : `ADHESIVE ${v}% SOFTENED`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   7. DAMAGE ACTIONS
+   ══════════════════════════════════════════════════════════════ */
+function addCut(uv) {
+  const x = uv.x, y = 1 - uv.y;
+  if (!currentCut) {
+    currentCut = { pts: [{ x, y }], w: 2.6 };
+    damage.cracks.push(currentCut);
+  } else {
+    const last = currentCut.pts[currentCut.pts.length - 1];
+    if (Math.hypot(x - last.x, y - last.y) * SCW > 12) {
+      currentCut.pts.push({ x, y });
+    }
+  }
+  damage.severity = Math.min(1.3, damage.severity + 0.010);
+}
+
+function finishCut() {
+  if (!currentCut) return;
+  const pts = currentCut.pts;
+  if (pts.length >= 2) {
+    /* branching fractures */
+    const branches = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < branches; i++) {
+      const base = pts[Math.floor(Math.random() * pts.length)];
+      const a = Math.random() * Math.PI * 2;
+      const len = 0.06 + Math.random() * 0.16;
+      const bp = [{ x: base.x, y: base.y }];
+      let cx = base.x, cy = base.y;
+      for (let s = 0; s < 3; s++) {
+        const aa = a + (Math.random() - 0.5) * 1.3;
+        cx += Math.cos(aa) * len / 3;
+        cy += Math.sin(aa) * len / 3;
+        bp.push({ x: cx, y: cy });
+      }
+      damage.cracks.push({ pts: bp, w: 1.4 + Math.random() * 1.4 });
+    }
+    /* dead pixels start spreading from the cut */
+    damage.dead.push({
+      x: pts[0].x, y: pts[0].y,
+      r: 0.02 + Math.random() * 0.025,
+      seed: Math.random() * 10,
+      grow: 0.006
+    });
+    damage.severity = Math.min(1.3, damage.severity + 0.09);
+    renderGlassCracks();
+  }
+  currentCut = null;
+}
+
+function shatter(uv) {
+  const x = uv.x, y = 1 - uv.y;
+  const n = 9 + Math.floor(Math.random() * 6);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const len = 0.10 + Math.random() * 0.34;
+    const pts = [{ x, y }];
+    let cx = x, cy = y;
+    const segs = 5 + Math.floor(Math.random() * 4);
+    for (let s = 0; s < segs; s++) {
+      const aa = a + (Math.random() - 0.5) * 0.95;
+      cx += Math.cos(aa) * len / segs;
+      cy += Math.sin(aa) * len / segs;
+      pts.push({ x: cx, y: cy });
+    }
+    damage.cracks.push({ pts, w: 2 + Math.random() * 3 });
+  }
+  /* concentric ring */
+  const ringPts = [];
+  const R = 0.05 + Math.random() * 0.08;
+  for (let i = 0; i <= 24; i++) {
+    const a = (i / 24) * Math.PI * 2;
+    const rr = R * (0.75 + 0.35 * Math.random());
+    ringPts.push({ x: x + Math.cos(a) * rr, y: y + Math.sin(a) * rr * 1.2 });
+  }
+  damage.cracks.push({ pts: ringPts, w: 2.4 });
+
+  damage.dead.push({ x, y, r: 0.035, seed: Math.random() * 10, grow: 0.014 });
+  damage.severity = Math.min(1.3, damage.severity + 0.26);
+  renderGlassCracks();
+  toast('Impact! The glass shattered and the panel underneath is dying.');
+}
+
+function repairScreen() {
+  damage.severity = 0;
+  damage.cracks.length = 0;
+  damage.dead.length = 0;
+  renderGlassCracks();
+  toast('Screen replaced. Damage cleared.');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   8. TOOL ACTIONS
+   ══════════════════════════════════════════════════════════════ */
+function detachPart(p, target, rotEuler) {
+  p.removed = true;
+  p.detachTarget.copy(target);
+  if (rotEuler) p.rotTarget.copy(rotEuler);
+}
+
+function screwsRemaining() {
+  return parts.filter(p => p.id.startsWith('screw') && !p.removed).length;
+}
+
+function tryPry(p) {
+  if (p.id === 'backCover') {
+    if (p.heat < 1) {
+      toast('Adhesive is too strong. Heat the back cover first (Heat Gun).');
+      return;
+    }
+    if (screwsRemaining() > 0) {
+      toast(`${screwsRemaining()} screws are still holding the frame. Remove them first.`);
+      return;
+    }
+    detachPart(p, new THREE.Vector3(0, -0.6, -5.5), new THREE.Vector3(-0.5, 0.35, 0.25));
+    toast('Back cover removed. The internals are exposed.');
+    return;
+  }
+
+  if (p.id === 'frontGlass') {
+    if (p.heat < 1) {
+      toast('Adhesive is too strong. Heat the front glass first (Heat Gun).');
+      return;
+    }
+    detachPart(p, new THREE.Vector3(0, 0.4, 6.2), new THREE.Vector3(0.35, -0.5, 0.2));
+    toast('Front glass lifted off. The display panel is underneath.');
+    return;
+  }
+
+  if (p.id === 'display') {
+    if (!partById.frontGlass.removed) {
+      toast('The front glass is still on top. Remove it first.');
+      return;
+    }
+    detachPart(p, new THREE.Vector3(0, 0.3, 4.0), new THREE.Vector3(0.2, 0.4, 0));
+    toast('Display panel freed. Note the thin flex cable at the bottom.');
+    return;
+  }
+
+  if (p.id === 'battery') {
+    toast('The battery is glued in with stretch-release tape — use the explode slider to lift it out.');
+    return;
+  }
+
+  toast('That part is fastened in place. Use the Explode slider to separate the layers.');
+}
+
+function tryUnscrew(p) {
+  if (!p.id.startsWith('screw')) {
+    toast('Point the screwdriver at a screw.');
+    return;
+  }
+  if (p.removed) return;
+
+  p.removed = true;
+  p.spin = 26;
+  p.detachTarget.set(
+    p.base.x * 0.6 + (Math.random() - 0.5) * 1.6,
+    p.base.y * 0.5 + (Math.random() - 0.5) * 1.6,
+    -3.4
+  );
+  p.rotTarget.set(Math.random() * 4, Math.random() * 4, Math.random() * 4);
+
+  const left = screwsRemaining();
+  toast(left > 0
+    ? `Screw out. ${left} remaining.`
+    : 'All screws removed — the frame is now free.');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   9. POINTER EVENTS
+   ══════════════════════════════════════════════════════════════ */
+const dom = renderer.domElement;
+
+dom.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  setPointer(e);
+  down = { x: e.clientX, y: e.clientY, t: performance.now(), moved: false };
+
+  if (tool === 'knife') {
+    const hits = pick();
+    const h = hits.find(isScreenHit);
+    if (h) {
+      cutting = true;
+      controls.enabled = false;
+      currentCut = null;
+      addCut(h.uv);
+    }
+  }
+}, { capture: true });
+
+dom.addEventListener('pointermove', e => {
+  setPointer(e);
+  if (down && !down.moved && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) {
+    down.moved = true;
+  }
+  if (cutting) {
+    const hits = pick();
+    const h = hits.find(isScreenHit);
+    if (h) addCut(h.uv);
+  }
+});
+
+window.addEventListener('pointerup', e => {
+  if (cutting) {
+    cutting = false;
+    controls.enabled = true;
+    if (currentCut) {
+      finishCut();
+      toast('You cut through the panel. Dead pixels are spreading from the cut.');
+    }
+    down = null;
+    return;
+  }
+  if (down && !down.moved && performance.now() - down.t < 600) {
+    handleClick();
+  }
+  down = null;
+});
+
+dom.addEventListener('pointerleave', () => { pointerInside = false; });
+
+function handleClick() {
+  const hits = pick();
+  if (!hits.length) {
+    if (tool === 'inspect') { infoEl.classList.remove('show'); selectedPart = null; }
+    return;
+  }
+  const h = hits[0];
+  const p = hitPart(h);
+  if (!p) return;
+
+  switch (tool) {
+    case 'inspect':
+      showInfo(p);
+      break;
+
+    case 'pry':
+      tryPry(p);
+      break;
+
+    case 'screw':
+      tryUnscrew(p);
+      break;
+
+    case 'hammer':
+      if (p.id === 'display' || p.id === 'frontGlass') shatter(h.uv);
+      else toast('Aim the hammer at the screen.');
+      break;
+
+    case 'knife':
+      if (p.id === 'display' || p.id === 'frontGlass') {
+        addCut(h.uv);
+        finishCut();
+        toast('Scored the panel with the blade.');
+      } else toast('Run the blade across the screen.');
+      break;
+
+    case 'heat':
+      toast('Hover over the back cover or front glass to heat the adhesive.');
+      break;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   10. TOOLBAR UI
+   ══════════════════════════════════════════════════════════════ */
+const toolButtons = [...document.querySelectorAll('#tools button')];
+toolButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    toolButtons.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    tool = btn.dataset.tool;
+    dom.style.cursor = tool === 'inspect' ? 'grab' : 'crosshair';
+
+    const hints = {
+      inspect: 'Click a component to read what it does.',
+      heat: 'Hover over a glued panel to soften the adhesive.',
+      pry: 'Click a heated panel to lift it off.',
+      screw: 'Click each screw to unscrew it.',
+      knife: 'Drag across the screen to slice the panel.',
+      hammer: 'Click the screen to smash it.',
+    };
+    toast(hints[tool]);
+  });
+});
+dom.style.cursor = 'grab';
+
+/* explode slider */
+const slider = document.getElementById('explode');
+slider.addEventListener('input', () => {
+  explodeTarget = slider.value / 100;
+});
+
+/* auto explode */
+let autoDir = 0;
+document.getElementById('autoBtn').addEventListener('click', () => {
+  autoDir = explodeTarget > 0.5 ? -1 : 1;
+});
+
+/* repair */
+document.getElementById('repairBtn').addEventListener('click', repairScreen);
+
+/* custom video */
+document.getElementById('videoFile').addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  if (videoEl) { URL.revokeObjectURL(videoEl.src); videoEl.pause(); }
+  videoEl = document.createElement('video');
+  videoEl.src = URL.createObjectURL(file);
+  videoEl.loop = true;
+  videoEl.muted = true;
+  videoEl.playsInline = true;
+  videoEl.play().catch(() => {});
+  toast('Video loaded — now break the screen and watch it die.');
+});
+
+/* ══════════════════════════════════════════════════════════════
+   11. PER-FRAME UPDATES
+   ══════════════════════════════════════════════════════════════ */
+function updateExplode(dt) {
+  if (autoDir !== 0) {
+    explodeTarget = THREE.MathUtils.clamp(explodeTarget + autoDir * dt * 0.55, 0, 1);
+    slider.value = Math.round(explodeTarget * 100);
+    if (explodeTarget <= 0 || explodeTarget >= 1) autoDir = 0;
+  }
+  explodeCur += (explodeTarget - explodeCur) * (1 - Math.pow(0.0015, dt));
+}
+
+function updateHeat(dt) {
+  if (tool === 'heat' && pointerInside) {
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(pickables, false);
+    let hovered = null;
+    if (hits.length) {
+      const p = hitPart(hits[0]);
+      if (p && p.heatable && !p.removed) hovered = p;
+    }
+    hoverHeatPart = hovered;
+  } else {
+    hoverHeatPart = null;
+  }
+
+  for (const p of parts) {
+    if (!p.heatable) continue;
+    const target = (p === hoverHeatPart) ? 1 : 0;
+    if (target === 1) {
+      p.heat = Math.min(1, p.heat + dt * 0.55);
+      if (p.heat >= 1 && !p._softNotified) {
+        p._softNotified = true;
+        toast(`${p.name} adhesive softened — pry it off now.`);
+      }
+    } else if (p.heat > 0) {
+      p.heat = Math.max(0, p.heat - dt * 0.12);
+      if (p.heat < 1) p._softNotified = false;
+    }
+
+    /* orange glow */
+    const g = p.heat;
+    for (const m of p.glow) {
+      if (m.emissive) m.emissive.setRGB(g * 0.85, g * 0.28, g * 0.04);
+    }
+  }
+
+  if (selectedPart && selectedPart.heatable) updateHeatBar();
+}
+
+function updateParts(dt) {
+  const k = 1 - Math.pow(0.0008, dt);
+  for (const p of parts) {
+    /* detach motion */
+    p.detach.lerp(p.detachTarget, k);
+    p.rot.x += (p.rotTarget.x - p.rot.x) * k;
+    p.rot.y += (p.rotTarget.y - p.rot.y) * k;
+    p.rot.z += (p.rotTarget.z - p.rot.z) * k;
+
+    /* screw spin */
+    if (p.spin > 0.02) {
+      p.object.rotation.z += p.spin * dt;
+      p.spin *= Math.pow(0.08, dt);
+    } else if (p.id.startsWith('screw')) {
+      p.object.rotation.set(p.rot.x, p.rot.y, p.object.rotation.z);
+    }
+
+    if (!p.id.startsWith('screw')) {
+      p.object.rotation.set(p.rot.x, p.rot.y, p.rot.z);
+    }
+
+    /* position = base + explode * amount + detach */
+    p.object.position.copy(p.base)
+      .addScaledVector(p.explode, explodeCur)
+      .add(p.detach);
+  }
+}
+
+function updateLabels() {
+  const show = explodeCur > 0.16;
+  for (const p of parts) {
+    if (!p.el) continue;
+    if (!show || p.removed) { p.el.style.opacity = 0; continue; }
+    const v = p.object.position.clone().project(camera);
+    if (v.z > 1) { p.el.style.opacity = 0; continue; }
+    const x = (v.x * 0.5 + 0.5) * innerWidth;
+    const y = (-v.y * 0.5 + 0.5) * innerHeight;
+    p.el.style.transform = `translate(-50%,-50%) translate(${x}px,${y}px)`;
+    p.el.style.opacity = 1;
+  }
+}
+
+function updateDamage(dt) {
+  /* dead zones slowly creep outward */
+  for (const d of damage.dead) {
+    d.r += d.grow * dt * 0.55;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   12. MAIN LOOP
+   ══════════════════════════════════════════════════════════════ */
+let last = performance.now();
+let elapsed = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const now = performance.now();
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  elapsed += dt;
+
+  updateExplode(dt);
+  updateHeat(dt);
+  updateParts(dt);
+  updateDamage(dt);
+  renderScreen(dt, elapsed);
+  updateLabels();
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   13. RESIZE + BOOT
+   ══════════════════════════════════════════════════════════════ */
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+renderGlassCracks();
+showInfo(partById.display);
+animate();
+
+setTimeout(() => toast('Tip: use the Explode slider, then click any part to learn what it does.'), 1400);
+</script>
+</body>
+</html>
