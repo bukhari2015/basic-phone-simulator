@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#070a11" />
-<title>PhoneLab — Scissors Edition</title>
+<title>PhoneLab — iPhone Rainbow Crack</title>
 <style>
   :root{
     --bg:#070a11; --panel:rgba(15,21,33,0.88); --line:rgba(120,160,255,0.18);
@@ -75,6 +75,7 @@
     background:rgba(255,255,255,.06);border:1px solid var(--line);transition:.15s;
     white-space:nowrap;}
   .btn:active{background:rgba(77,163,255,.22);}
+  .btn.on{background:rgba(255,180,80,.20);border-color:rgba(255,180,80,.6);color:#ffcf9a;}
   .btn.file{position:relative;overflow:hidden;}
   .btn.file input{position:absolute;inset:0;opacity:0;font-size:0;}
 
@@ -98,7 +99,7 @@
     #fps{top:18px;right:20px;font-size:12px;padding:7px 12px;}
     #tools{left:20px;bottom:auto;top:50%;transform:translateY(-50%);
       flex-direction:column;gap:6px;padding:8px;max-width:none;flex-wrap:nowrap;}
-    #tools button{flex-direction:row;font-size:12.5px;padding:9px 10px;min-width:140px;gap:9px;}
+    #tools button{flex-direction:row;font-size:12.5px;padding:9px 10px;min-width:150px;gap:9px;}
     #tools button span{font-size:15px;width:18px;}
     #info{left:auto;right:20px;top:64px;width:290px;padding:16px;transform:translateY(-8px);}
     #info h2{font-size:14px;}
@@ -113,7 +114,7 @@
 <div id="ui">
   <div id="header">
     <h1>PHONE<span>LAB</span></h1>
-    <p>Teardown + LCD damage simulator</p>
+    <p>iPhone rainbow crack simulator</p>
   </div>
 
   <div id="fps" class="panel">FPS <span>—</span></div>
@@ -122,10 +123,11 @@
     <button data-tool="all" class="all active"><span>⚡</span>ALL</button>
     <button data-tool="inspect"><span>🔍</span>Look</button>
     <button data-tool="heat"><span>🔥</span>Heat</button>
+    <button data-tool="lift"><span>🖌️</span>Felt</button>
     <button data-tool="pry"><span>🪛</span>Pry</button>
     <button data-tool="screw"><span>🔧</span>Screw</button>
-    <button data-tool="knife"><span>🔪</span>Slice</button>
     <button data-tool="scissors"><span>✂️</span>Scissors</button>
+    <button data-tool="knife"><span>🔪</span>Slice</button>
     <button data-tool="hammer"><span>🔨</span>Smash</button>
   </div>
 
@@ -140,6 +142,7 @@
 
   <div id="bottom" class="panel">
     <label>SPLIT <input type="range" id="explode" min="0" max="100" value="0"></label>
+    <button class="btn on" id="hcutBtn">H‑CUT</button>
     <button class="btn" id="autoBtn">AUTO</button>
     <button class="btn" id="repairBtn">FIX</button>
     <label class="btn file">VIDEO<input type="file" id="videoFile" accept="video/*"></label>
@@ -332,17 +335,18 @@ function drawProcedural(ctx, W, H, t) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   6. DAMAGE MODEL — cracks + cut chunks + scissors draft
+   6. DAMAGE MODEL
    ═══════════════════════════════════════════════════════════ */
 const damage = {
   severity: 0,
   cracks: [],
-  chunks: [],   // { x, y, w, h, hue, seed, age }
+  chunks: [],
 };
 
-let scissorsDraft = null; // { x1, y1, x2, y2 } in UV coords (0..1, y down)
+let scissorsDraft = null;
+let hCutMode = true;   // horizontal-only cutting
 
-/* ---------- glass overlay (cracks) ---------- */
+/* ---------- glass overlay (cracks + chunk outlines) ---------- */
 const GCW = 256, GCH = 512;
 const glassCanvas = document.createElement('canvas');
 glassCanvas.width = GCW;
@@ -356,7 +360,6 @@ function renderGlassCracks() {
   gctx.lineCap = 'round';
   gctx.lineJoin = 'round';
 
-  /* cracks */
   for (const cr of damage.cracks) {
     if (cr.pts.length < 2) continue;
     gctx.beginPath();
@@ -370,7 +373,6 @@ function renderGlassCracks() {
     gctx.stroke();
   }
 
-  /* chunk outlines — thick glowing border on the glass */
   for (const c of damage.chunks) {
     const x = c.x * GCW, y = c.y * GCH;
     const w = c.w * GCW, h = c.h * GCH;
@@ -385,8 +387,10 @@ function renderGlassCracks() {
   glassTex.needsUpdate = true;
 }
 
-/* ---------- LCD damage rendering for a cut chunk ---------- */
-function drawChunk(ctx, c, W, H, time) {
+/* ═══════════════════════════════════════════════════════════
+   6b. iPhone-style rainbow LCD damage
+   ═══════════════════════════════════════════════════════════ */
+function drawIPhoneRainbow(ctx, c, W, H, time) {
   const x = c.x * W;
   const y = c.y * H;
   const w = c.w * W;
@@ -398,72 +402,99 @@ function drawChunk(ctx, c, W, H, time) {
   ctx.rect(x, y, w, h);
   ctx.clip();
 
-  /* 1 — rainbow LCD bleed (like a broken iPhone) */
-  const hueShift = (c.hue + time * 25) % 360;
-  const rg = ctx.createLinearGradient(x, y, x + w, y + h);
-  rg.addColorStop(0.00, `hsl(${(hueShift +   0) % 360}, 95%, 58%)`);
-  rg.addColorStop(0.20, `hsl(${(hueShift +  60) % 360}, 95%, 58%)`);
-  rg.addColorStop(0.40, `hsl(${(hueShift + 130) % 360}, 95%, 58%)`);
-  rg.addColorStop(0.60, `hsl(${(hueShift + 200) % 360}, 95%, 58%)`);
-  rg.addColorStop(0.80, `hsl(${(hueShift + 270) % 360}, 95%, 58%)`);
-  rg.addColorStop(1.00, `hsl(${(hueShift + 340) % 360}, 95%, 58%)`);
-  ctx.fillStyle = rg;
+  /* 1 — dark base (dead panel) */
+  ctx.fillStyle = '#050608';
   ctx.fillRect(x, y, w, h);
 
-  /* 2 — horizontal white/black scan bands (flickering) */
-  const bandCount = 12 + (c.seed % 4);
+  /* 2 — horizontal rainbow bands (the signature iPhone look) */
+  const bandCount = 18 + (c.seed % 8);
   const bandH = h / bandCount;
-  for (let i = 0; i < bandCount; i++) {
-    const by = y + i * bandH;
-    const flicker = 0.75 + 0.25 * Math.sin(time * 8 + i * 1.7 + c.seed);
-    if (i % 2 === 0) {
-      ctx.fillStyle = `rgba(0,0,0,${0.55 * flicker})`;
-      ctx.fillRect(x, by, w, bandH * 0.5);
-    } else {
-      ctx.fillStyle = `rgba(255,255,255,${0.42 * flicker})`;
-      ctx.fillRect(x, by, w, bandH * 0.35);
+  const scroll = (time * 22 + c.seed * 40) % (bandH * 4);
+
+  for (let i = -2; i < bandCount + 2; i++) {
+    const by = y + i * bandH + scroll;
+    const rel = i / bandCount;
+
+    /* hue cycles along the band — bright saturated colors */
+    const hueA = (c.hue + rel * 240 + time * 30) % 360;
+    const hueB = (c.hue + rel * 240 + 120 + time * 30) % 360;
+
+    const bg = ctx.createLinearGradient(x, by, x + w, by);
+    bg.addColorStop(0,   `hsl(${hueA}, 100%, 52%)`);
+    bg.addColorStop(0.35, `hsl(${(hueA + 40) % 360}, 100%, 60%)`);
+    bg.addColorStop(0.65, `hsl(${hueB}, 100%, 55%)`);
+    bg.addColorStop(1,   `hsl(${(hueB + 60) % 360}, 100%, 50%)`);
+
+    /* random black gaps between bands (dead rows) */
+    const dead = Math.sin(i * 2.7 + c.seed) > 0.55;
+    ctx.fillStyle = dead ? 'rgba(0,0,0,0.9)' : bg;
+    ctx.fillRect(x, by, w, bandH * 0.92);
+
+    /* thin bright separator line */
+    if (!dead && Math.sin(i * 1.3 + c.seed) > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillRect(x, by - 1, w, 1.5);
     }
   }
 
-  /* 3 — static noise speckles */
-  const noiseCount = Math.min(60, Math.floor(w * h / 120));
-  for (let i = 0; i < noiseCount; i++) {
-    const nx = x + Math.random() * w;
-    const ny = y + Math.random() * h;
-    const nw = 1 + Math.random() * 4;
-    const nh = 1 + Math.random() * 2;
-    ctx.fillStyle = Math.random() > 0.5
-      ? `rgba(255,255,255,${0.4 + Math.random() * 0.4})`
-      : `rgba(0,0,0,${0.4 + Math.random() * 0.4})`;
-    ctx.fillRect(nx, ny, nw, nh);
+  /* 3 — vertical smearing streaks (ribbon cable damage) */
+  const streakCount = 4 + Math.floor(c.seed % 4);
+  for (let i = 0; i < streakCount; i++) {
+    const sx = x + ((Math.sin(c.seed + i * 1.9) + 1) / 2) * w;
+    const sw = 2 + Math.random() * 8;
+    const grad = ctx.createLinearGradient(sx, y, sx, y + h);
+    const hueS = (c.hue + i * 70 + time * 20) % 360;
+    grad.addColorStop(0, `hsla(${hueS}, 100%, 70%, 0.0)`);
+    grad.addColorStop(0.3, `hsla(${hueS}, 100%, 65%, 0.75)`);
+    grad.addColorStop(0.7, `hsla(${(hueS + 180) % 360}, 100%, 65%, 0.65)`);
+    grad.addColorStop(1, `hsla(${hueS}, 100%, 70%, 0.0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(sx, y, sw, h);
   }
 
-  /* 4 — dark corner fade (dead zone feel) */
-  const cg = ctx.createRadialGradient(
-    x + w / 2, y + h / 2, Math.min(w, h) * 0.15,
-    x + w / 2, y + h / 2, Math.max(w, h) * 0.65
-  );
-  cg.addColorStop(0, 'rgba(0,0,0,0)');
-  cg.addColorStop(1, 'rgba(0,0,0,0.55)');
-  ctx.fillStyle = cg;
+  /* 4 — flickering brightness pulse */
+  const flicker = 0.82 + 0.18 * Math.sin(time * 11 + c.seed * 3);
+  ctx.fillStyle = `rgba(255,255,255,${0.06 * flicker})`;
   ctx.fillRect(x, y, w, h);
+
+  /* 5 — black bleed from the cut edges (real LCD leaks dark) */
+  const edgeW = Math.min(w, h) * 0.22;
+  const eg = ctx.createLinearGradient(x, y, x + edgeW, y);
+  eg.addColorStop(0, 'rgba(0,0,0,0.85)');
+  eg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = eg;
+  ctx.fillRect(x, y, edgeW, h);
+  const eg2 = ctx.createLinearGradient(x + w, y, x + w - edgeW, y);
+  eg2.addColorStop(0, 'rgba(0,0,0,0.85)');
+  eg2.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = eg2;
+  ctx.fillRect(x + w - edgeW, y, edgeW, h);
+
+  /* 6 — noise speckles */
+  const nCount = Math.min(50, Math.floor(w * h / 200));
+  for (let i = 0; i < nCount; i++) {
+    const nx = x + Math.random() * w;
+    const ny = y + Math.random() * h;
+    ctx.fillStyle = Math.random() > 0.5
+      ? `rgba(255,255,255,${0.25 + Math.random() * 0.45})`
+      : `rgba(0,0,0,${0.3 + Math.random() * 0.5})`;
+    ctx.fillRect(nx, ny, 1 + Math.random() * 3, 1 + Math.random() * 2);
+  }
 
   ctx.restore();
 
-  /* 5 — bright cut edges on top */
+  /* cut border on top */
   ctx.strokeStyle = 'rgba(255,255,255,0.95)';
   ctx.lineWidth = 2;
   ctx.strokeRect(x, y, w, h);
-  ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.8)';
   ctx.lineWidth = 1;
   ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
-  ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
 }
 
 function renderScreen(time) {
   const ctx = sctx, W = SCW, H = SCH;
 
-  /* 1 — base video / procedural feed */
   if (videoEl && videoEl.readyState >= 2 && videoEl.videoWidth) {
     const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
     const s = Math.max(W / vw, H / vh);
@@ -472,10 +503,8 @@ function renderScreen(time) {
     drawProcedural(ctx, W, H, time);
   }
 
-  /* 2 — cut chunks (rainbow / white-black LCD damage) */
-  for (const c of damage.chunks) drawChunk(ctx, c, W, H, time);
+  for (const c of damage.chunks) drawIPhoneRainbow(ctx, c, W, H, time);
 
-  /* 3 — cracks on top of the screen */
   ctx.lineCap = 'round';
   for (const cr of damage.cracks) {
     if (cr.pts.length < 2) continue;
@@ -490,7 +519,7 @@ function renderScreen(time) {
     ctx.stroke();
   }
 
-  /* 4 — scissors rectangle preview */
+  /* scissors preview */
   if (scissorsDraft) {
     const { x1, y1, x2, y2 } = scissorsDraft;
     const rx = Math.min(x1, x2) * W;
@@ -499,17 +528,16 @@ function renderScreen(time) {
     const rh = Math.abs(y2 - y1) * H;
 
     ctx.save();
-    ctx.fillStyle = 'rgba(120,220,255,0.16)';
+    ctx.fillStyle = 'rgba(255,180,80,0.18)';
     ctx.fillRect(rx, ry, rw, rh);
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.strokeStyle = 'rgba(255,220,140,0.95)';
     ctx.lineWidth = 2;
     ctx.setLineDash([10, 7]);
     ctx.lineDashOffset = -time * 40;
     ctx.strokeRect(rx, ry, rw, rh);
     ctx.setLineDash([]);
 
-    /* corner markers */
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
     const cs = 6;
     ctx.fillRect(rx - cs / 2, ry - cs / 2, cs, cs);
@@ -519,7 +547,6 @@ function renderScreen(time) {
     ctx.restore();
   }
 
-  /* 5 — panel fade-out as severity climbs */
   if (damage.severity > 0.6) {
     const f = Math.min(0.92, (damage.severity - 0.6) * 1.6);
     ctx.fillStyle = `rgba(0,0,0,${f})`;
@@ -766,7 +793,7 @@ registerPart({
   explode: new THREE.Vector3(0, 0, 2.0),
   heatable: true,
   glow: [matGlass],
-  info: 'Protects the screen. It is glued down — heat it first to remove it.'
+  info: 'Protects the screen. Heat it, then use the Felt tool to lift it off so you can cut the panel underneath.'
 });
 
 /* ---------- BACK COVER ---------- */
@@ -824,8 +851,8 @@ const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2(0, 0);
 
 let down = null;
-let cutting = false;      // knife free-form slicing
-let scissoring = false;   // scissors rectangle cut
+let cutting = false;
+let scissoring = false;
 let currentCut = null;
 let hoverHeatPart = null;
 let selectedPart = null;
@@ -882,7 +909,7 @@ function updateHeatBar() {
   const v = Math.round(selectedPart.heat * 100);
   heatFill.style.width = v + '%';
   if (selectedPart.heatLocked) {
-    heatLabel.textContent = 'GLUE SOFTENED ✓ — PRY IT OFF';
+    heatLabel.textContent = 'GLUE SOFTENED ✓ — LIFT IT OFF';
     heatLabel.classList.add('hot');
   } else {
     heatLabel.textContent = `GLUE ${v}% SOFTENED`;
@@ -932,17 +959,24 @@ function finishCut() {
   currentCut = null;
 }
 
-/* ---------- commit a scissors rectangle cut ---------- */
 function commitScissorsCut() {
   if (!scissorsDraft) return;
-  const { x1, y1, x2, y2 } = scissorsDraft;
+  let { x1, y1, x2, y2 } = scissorsDraft;
+
+  /* enforce horizontal-only in H-CUT mode */
+  if (hCutMode) {
+    const midY = (y1 + y2) / 2;
+    const halfH = Math.abs(y2 - y1) / 2;
+    y1 = midY - halfH;
+    y2 = midY + halfH;
+  }
+
   const cx = Math.min(x1, x2);
   const cy = Math.min(y1, y2);
   const cw = Math.abs(x2 - x1);
   const ch = Math.abs(y2 - y1);
 
-  /* ignore tiny drafts */
-  if (cw < 0.04 || ch < 0.04) {
+  if (cw < 0.04 || ch < 0.025) {
     scissorsDraft = null;
     return;
   }
@@ -951,23 +985,16 @@ function commitScissorsCut() {
     x: cx, y: cy, w: cw, h: ch,
     hue: Math.random() * 360,
     seed: Math.random() * 100,
-    age: 0,
   });
 
-  /* add a crack ring around the cut */
   const rect = [
-    { x: cx,         y: cy },
-    { x: cx + cw,    y: cy },
-    { x: cx + cw,    y: cy + ch },
-    { x: cx,         y: cy + ch },
-    { x: cx,         y: cy },
+    { x: cx, y: cy }, { x: cx + cw, y: cy },
+    { x: cx + cw, y: cy + ch }, { x: cx, y: cy + ch },
+    { x: cx, y: cy },
   ];
   damage.cracks.push({ pts: rect, w: 2.6 });
 
-  /* fracture lines radiating outward */
-  const corners = [
-    [cx, cy], [cx + cw, cy], [cx + cw, cy + ch], [cx, cy + ch]
-  ];
+  const corners = [[cx, cy], [cx + cw, cy], [cx + cw, cy + ch], [cx, cy + ch]];
   corners.forEach(([px, py]) => {
     const a = Math.random() * Math.PI * 2;
     const len = 0.06 + Math.random() * 0.16;
@@ -986,7 +1013,7 @@ function commitScissorsCut() {
   renderGlassCracks();
   scissorsDraft = null;
 
-  toast('Cut out a chunk — the panel is bleeding rainbow.');
+  toast('Cut a chunk — iPhone rainbow LCD damage is spreading.');
 }
 
 function shatter(uv) {
@@ -1042,6 +1069,19 @@ function screwsRemaining() {
   return parts.filter(p => p.id.startsWith('screw') && !p.removed).length;
 }
 
+/* ---------- FELT: lift the front glass so the panel is exposed ---------- */
+function tryLift(p) {
+  if (p.id !== 'frontGlass') {
+    toast('The Felt tool lifts the front glass off the screen.');
+    return;
+  }
+  if (p.removed) return toast('The glass is already off — cut the panel now.');
+  if (!p.heatLocked) return toast('Heat the front glass first, then use the Felt tool.');
+
+  detachPart(p, new THREE.Vector3(0, 0.5, 6.4), new THREE.Vector3(0.4, -0.55, 0.22));
+  toast('Glass lifted off — the bare panel is exposed. Cut it now.');
+}
+
 function tryPry(p) {
   if (p.removed) return toast('Already removed.');
 
@@ -1053,13 +1093,12 @@ function tryPry(p) {
     return toast('Back cover off. Internals exposed.');
   }
   if (p.id === 'frontGlass') {
-    if (!p.heatLocked) return toast('Glue too strong. Heat the front glass first.');
-    detachPart(p, new THREE.Vector3(0, 0.4, 6.2), new THREE.Vector3(0.35, -0.5, 0.2));
-    return toast('Front glass lifted. Screen underneath.');
+    tryLift(p);
+    return;
   }
   if (p.id === 'display') {
     if (!partById.frontGlass.removed)
-      return toast('Front glass is still on top. Remove it first.');
+      return toast('Lift the front glass off first with the Felt tool.');
     detachPart(p, new THREE.Vector3(0, 0.3, 4.0), new THREE.Vector3(0.2, 0.4, 0));
     return toast('Screen freed.');
   }
@@ -1111,7 +1150,6 @@ dom.addEventListener('pointerdown', e => {
   setPointer(e.clientX, e.clientY);
   down = { x: e.clientX, y: e.clientY, t: performance.now(), moved: false };
 
-  /* Knife → free-form slicing */
   if (tool === 'knife') {
     const hits = pick();
     const h = hits.find(isScreenHit);
@@ -1125,7 +1163,6 @@ dom.addEventListener('pointerdown', e => {
     return;
   }
 
-  /* Scissors or ALL → rectangle chunk cut */
   if (tool === 'scissors' || tool === 'all') {
     const hits = pick();
     const h = hits.find(isScreenHit);
@@ -1159,6 +1196,12 @@ dom.addEventListener('pointermove', e => {
     if (h) {
       scissorsDraft.x2 = Math.max(0, Math.min(1, h.uv.x));
       scissorsDraft.y2 = Math.max(0, Math.min(1, 1 - h.uv.y));
+
+      /* in H-CUT mode, lock Y so the rectangle stays horizontal */
+      if (hCutMode) {
+        scissorsDraft.y1 = scissorsDraft.y1;
+        scissorsDraft.y2 = scissorsDraft.y1;
+      }
     }
   }
 });
@@ -1212,7 +1255,14 @@ function handleTap() {
 
   switch (tool) {
     case 'inspect': showInfo(p); break;
-    case 'pry':     tryPry(p); break;
+
+    case 'lift':
+      tryLift(p);
+      break;
+
+    case 'pry':
+      tryPry(p);
+      break;
 
     case 'screw':
       if (!tryUnscrew(p)) toast('Point the screwdriver at a screw.');
@@ -1231,13 +1281,12 @@ function handleTap() {
       break;
 
     case 'scissors':
-      /* single tap = small chunk cut at that spot */
       if (p.id === 'display' || p.id === 'frontGlass') {
         const ux = h.uv.x, uy = 1 - h.uv.y;
-        const s = 0.10;
+        const s = hCutMode ? 0.06 : 0.10;
         scissorsDraft = {
-          x1: Math.max(0, ux - s / 2), y1: Math.max(0, uy - s / 2),
-          x2: Math.min(1, ux + s / 2), y2: Math.min(1, uy + s / 2),
+          x1: Math.max(0, ux - 0.18), y1: Math.max(0, uy - s / 2),
+          x2: Math.min(1, ux + 0.18), y2: Math.min(1, uy + s / 2),
         };
         commitScissorsCut();
       } else toast('Tap or drag on the screen to cut a chunk.');
@@ -1251,17 +1300,25 @@ function handleTap() {
       if (p.id.startsWith('screw')) { tryUnscrew(p); return; }
 
       if (p.id === 'backCover' || p.id === 'frontGlass') {
-        if (p.heatLocked) { tryPry(p); return; }
+        if (p.heatLocked) {
+          if (p.id === 'frontGlass') tryLift(p);
+          else tryPry(p);
+          return;
+        }
         heatTarget(p);
         return;
       }
 
-      if (p.id === 'display' || p.id === 'frontGlass') {
+      if (p.id === 'display') {
+        if (!partById.frontGlass.removed) {
+          toast('Lift the front glass off first with the Felt tool.');
+          return;
+        }
         const ux = h.uv.x, uy = 1 - h.uv.y;
-        const s = 0.10;
+        const s = hCutMode ? 0.06 : 0.10;
         scissorsDraft = {
-          x1: Math.max(0, ux - s / 2), y1: Math.max(0, uy - s / 2),
-          x2: Math.min(1, ux + s / 2), y2: Math.min(1, uy + s / 2),
+          x1: Math.max(0, ux - 0.18), y1: Math.max(0, uy - s / 2),
+          x2: Math.min(1, ux + 0.18), y2: Math.min(1, uy + s / 2),
         };
         commitScissorsCut();
         return;
@@ -1289,7 +1346,7 @@ function heatTarget(p) {
   for (const m of p.glow) {
     if (m.emissive) m.emissive.setRGB(0.9, 0.30, 0.05);
   }
-  toast(`${p.name} heated — glue softened. Pry it off.`);
+  toast(`${p.name} heated — glue softened. Use Felt or Pry to lift it.`);
   if (selectedPart === p) updateHeatBar();
 }
 
@@ -1313,7 +1370,7 @@ function updateHeat(dt) {
         }
         if (p.heat >= 1 && !p.heatLocked) {
           p.heatLocked = true;
-          toast(`${p.name} glue softened — it stays hot. Pry it off.`);
+          toast(`${p.name} glue softened — it stays hot. Lift it off.`);
         }
       }
     }
@@ -1405,9 +1462,6 @@ function animate() {
   updateHeat(dt);
   updateParts(dt);
 
-  /* age chunks (used for seed drift) */
-  for (const c of damage.chunks) c.age += dt;
-
   screenAccum += dt;
   if (screenAccum >= screenInterval) {
     screenAccum = 0;
@@ -1438,13 +1492,14 @@ toolButtons.forEach(btn => {
     tool = btn.dataset.tool;
 
     const hints = {
-      all:      'Drag on the screen to cut a chunk · tap screws, glued panels, or parts to act.',
+      all:      'Drag on the screen to cut a horizontal chunk · tap parts to act.',
       inspect:  'Tap a part to learn what it does.',
       heat:     'Tap or drag over a glued panel — heat locks in.',
+      lift:     'Tap the heated front glass with the Felt to lift it off.',
       pry:      'Tap a heated panel to lift it off.',
       screw:    'Tap each screw to unscrew it.',
+      scissors: 'Drag a rectangle on the screen — release to cut that chunk.',
       knife:    'Drag across the screen to slice it.',
-      scissors: 'Drag a rectangle on the screen — release to cut that chunk out.',
       hammer:   'Tap the screen to smash it.',
     };
     toast(hints[tool]);
@@ -1454,6 +1509,13 @@ toolButtons.forEach(btn => {
 const slider = document.getElementById('explode');
 slider.addEventListener('input', () => {
   explodeTarget = slider.value / 100;
+});
+
+const hcutBtn = document.getElementById('hcutBtn');
+hcutBtn.addEventListener('click', () => {
+  hCutMode = !hCutMode;
+  hcutBtn.classList.toggle('on', hCutMode);
+  toast(hCutMode ? 'H-CUT ON — cuts stay horizontal.' : 'H-CUT OFF — free-form cutting.');
 });
 
 document.getElementById('autoBtn').addEventListener('click', () => {
@@ -1472,7 +1534,7 @@ document.getElementById('videoFile').addEventListener('change', e => {
   videoEl.muted = true;
   videoEl.playsInline = true;
   videoEl.play().catch(() => {});
-  toast('Video loaded. Now try cutting a chunk out.');
+  toast('Video loaded. Now cut a chunk out.');
 });
 
 /* ═══════════════════════════════════════════════════════════
@@ -1496,7 +1558,7 @@ renderGlassCracks();
 showInfo(partById.display);
 animate();
 
-setTimeout(() => toast('Drag on the screen to cut a chunk out — the panel will bleed rainbow.'), 1200);
+setTimeout(() => toast('H‑CUT is on — drag on the screen to cut a horizontal rainbow chunk.'), 1200);
 </script>
 </body>
 </html>
